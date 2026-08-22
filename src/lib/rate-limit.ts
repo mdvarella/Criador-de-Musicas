@@ -38,20 +38,28 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const safeIdentifier = (identifier || 'unknown').slice(0, 120);
 
-  const { data, error } = await supabaseAdmin().rpc('increment_rate_limit', {
-    p_bucket: rule.bucket,
-    p_identifier: safeIdentifier,
-    p_window_start: windowStart(rule.windowSeconds),
-  });
+  // Falha no contador não pode derrubar a venda: registramos e liberamos.
+  // O try cobre também a criação do cliente, que lança quando o Supabase ainda
+  // não foi configurado — do contrário toda rota morreria antes de validar o
+  // próprio payload.
+  try {
+    const { data, error } = await supabaseAdmin().rpc('increment_rate_limit', {
+      p_bucket: rule.bucket,
+      p_identifier: safeIdentifier,
+      p_window_start: windowStart(rule.windowSeconds),
+    });
 
-  if (error) {
-    // Falha no contador não pode derrubar a venda: registramos e liberamos.
-    logger.warn('rate_limit.unavailable', { bucket: rule.bucket, error: error.message });
+    if (error) throw new Error(error.message);
+
+    const hits = typeof data === 'number' ? data : 0;
+    return { allowed: hits <= rule.limit, hits, limit: rule.limit };
+  } catch (error) {
+    logger.warn('rate_limit.unavailable', {
+      bucket: rule.bucket,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return { allowed: true, hits: 0, limit: rule.limit };
   }
-
-  const hits = typeof data === 'number' ? data : 0;
-  return { allowed: hits <= rule.limit, hits, limit: rule.limit };
 }
 
 export async function enforceRateLimit(rule: RateLimitRule, identifier: string): Promise<void> {

@@ -12,7 +12,9 @@ coverage/
 .env.production.local
 
 *.tsbuildinfo
-next-env.d.ts.timestamp
+# Gerado pelo Next e reescrito conforme o comando (dev x build). Fora do
+# versionamento por convenção do próprio create-next-app.
+next-env.d.ts
 .DS_Store
 .vercel
 .idea/
