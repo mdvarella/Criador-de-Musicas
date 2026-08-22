@@ -1,0 +1,192 @@
+@import 'tailwindcss';
+
+/*
+  Identidade visual.
+
+  O produto vende emoção, não tecnologia: paleta quente (vinho + dourado),
+  tipografia com serifa nos títulos e muito respiro. Tudo pensado primeiro para
+  a tela do celular, que é de onde vem quase todo o tráfego.
+*/
+@theme {
+  --color-ink: #1b1020;
+  --color-ink-soft: #4a3a52;
+  --color-cream: #fdf8f4;
+  --color-cream-deep: #f6ece4;
+
+  --color-wine-50: #fdf2f6;
+  --color-wine-100: #fbe3ed;
+  --color-wine-200: #f7c8db;
+  --color-wine-400: #d9628f;
+  --color-wine-500: #c1467a;
+  --color-wine-600: #a02f63;
+  --color-wine-700: #7c2450;
+  --color-wine-900: #43122c;
+
+  --color-gold-200: #f6e2b8;
+  --color-gold-400: #e6bd6a;
+  --color-gold-500: #d4a244;
+
+  /* As fontes chegam via next/font, que expõe as variáveis abaixo no <html>. */
+  --font-display: var(--font-playfair), 'Georgia', 'Times New Roman', serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --radius-card: 1.5rem;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  /* Alvos de toque confortáveis: o formulário inteiro é preenchido no celular. */
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-wine-500);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .app-container {
+    width: 100%;
+    max-width: 72rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    background-image: linear-gradient(
+      135deg,
+      var(--color-wine-600) 0%,
+      var(--color-wine-500) 55%,
+      var(--color-gold-500) 160%
+    );
+    color: white;
+    font-weight: 600;
+    padding: 0.95rem 1.75rem;
+    box-shadow: 0 14px 30px -14px rgba(124, 36, 80, 0.75);
+    transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 36px -14px rgba(124, 36, 80, 0.85);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.55;
+    transform: none;
+    cursor: not-allowed;
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-wine-200);
+    color: var(--color-wine-700);
+    font-weight: 600;
+    padding: 0.85rem 1.5rem;
+    background: white;
+    transition: background 150ms ease;
+  }
+
+  .btn-ghost:hover {
+    background: var(--color-wine-50);
+  }
+
+  .card {
+    background: white;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--color-cream-deep);
+    box-shadow: 0 20px 45px -32px rgba(27, 16, 32, 0.45);
+  }
+
+  .field-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-ink-soft);
+    margin-bottom: 0.4rem;
+  }
+
+  .field-input {
+    width: 100%;
+    border-radius: 0.9rem;
+    border: 1px solid var(--color-cream-deep);
+    background: white;
+    padding: 0.85rem 1rem;
+    font-size: 1rem;
+    color: var(--color-ink);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .field-input:focus {
+    border-color: var(--color-wine-400);
+    box-shadow: 0 0 0 4px var(--color-wine-50);
+    outline: none;
+  }
+
+  .field-error {
+    color: var(--color-wine-600);
+    font-size: 0.85rem;
+    margin-top: 0.35rem;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-cream-deep);
+    background: white;
+    padding: 0.7rem 1.1rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--color-ink-soft);
+    transition: all 150ms ease;
+  }
+
+  .chip[data-selected='true'] {
+    border-color: var(--color-wine-500);
+    background: var(--color-wine-50);
+    color: var(--color-wine-700);
+    font-weight: 600;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

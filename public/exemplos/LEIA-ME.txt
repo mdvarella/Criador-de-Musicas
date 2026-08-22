@@ -1,0 +1,8 @@
+Coloque aqui um arquivo chamado `exemplo.mp3` para que o player de exemplo
+apareça na landing page.
+
+Use apenas uma música cuja divulgação tenha sido autorizada por escrito pelo
+cliente. Nenhuma história ou música de cliente pode ser publicada sem
+autorização explícita (ver /privacidade).
+
+Sem esse arquivo, a seção simplesmente não é exibida.
