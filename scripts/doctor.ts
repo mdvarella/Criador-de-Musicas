@@ -70,6 +70,9 @@ async function main() {
     console.log('  ⚠  não foi possível ler:', error instanceof Error ? error.message : error);
   }
 
+  console.log('\n=== Webhook de pagamento ===');
+  reportWebhook();
+
   console.log('\n=== Providers que serão usados ===');
   if (process.env.USE_MOCK_PROVIDERS === 'true') {
     console.log('  ⚠  USE_MOCK_PROVIDERS=true ignora o banco: TUDO roda em mock.');
@@ -91,6 +94,56 @@ async function report(kind: string, resolve: () => Promise<{ name: string; model
   } catch (error) {
     console.log(`  ${kind.padEnd(10)} ⚠  ${error instanceof Error ? error.message : error}`);
   }
+}
+
+/**
+ * Confere o endereço que o gateway vai receber como `notification_url`.
+ *
+ * É o erro mais comum ao ligar o pagamento: `NEXT_PUBLIC_APP_URL` fica em
+ * localhost, o gateway não consegue alcançar a rota, e o pagamento aprovado
+ * nunca vira música — sem nenhum erro visível, porque a falha acontece do lado
+ * de lá.
+ */
+function reportWebhook() {
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
+
+  if (!appUrl) {
+    console.log('  ⚠  NEXT_PUBLIC_APP_URL vazia: o gateway não saberá para onde notificar.');
+    return;
+  }
+
+  const webhookUrl = `${appUrl}/api/webhooks/mercadopago`;
+  console.log(`  notification_url        ${webhookUrl}`);
+
+  let host = '';
+  try {
+    host = new URL(appUrl).hostname;
+  } catch {
+    console.log('  ⚠  NEXT_PUBLIC_APP_URL não é uma URL válida.');
+    return;
+  }
+
+  const isLocal =
+    host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local') || host === '[::1]';
+
+  if (isLocal) {
+    console.log(
+      '  ⚠  Endereço LOCAL: o gateway não alcança esta máquina pela internet.\n' +
+        '     Suba um túnel público e aponte NEXT_PUBLIC_APP_URL para a URL dele.',
+    );
+  } else if (!appUrl.startsWith('https://')) {
+    console.log('  ⚠  O gateway exige HTTPS para entregar notificações.');
+  } else {
+    console.log('  ✓  Alcançável pela internet.');
+  }
+
+  console.log(
+    `  segredo do webhook      ${
+      process.env.MERCADO_PAGO_WEBHOOK_SECRET
+        ? 'definido'
+        : '⚠  AUSENTE — toda notificação será recusada com 401'
+    }`,
+  );
 }
 
 /** Aponta chaves repetidas, que são a causa clássica de "configurei e não pegou". */

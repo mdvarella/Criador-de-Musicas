@@ -392,12 +392,48 @@ Como o endpoint se comporta:
 
 Falha transitória devolve **500** para que o gateway reentregue.
 
-Testando localmente:
+#### Testando localmente
+
+O gateway precisa alcançar sua máquina pela internet — `localhost` não existe
+para ele. É preciso um túnel público:
 
 ```bash
-npx localtunnel --port 3000     # ou ngrok http 3000
-# cadastre a URL pública no painel do Mercado Pago
+npx localtunnel --port 3000     # ou: ngrok http 3000
 ```
+
+Depois, **aponte `NEXT_PUBLIC_APP_URL` para a URL do túnel** e reinicie o
+`npm run dev`. É dessa variável que sai a `notification_url` enviada ao gateway;
+esquecê-la é o erro mais comum, e a falha é silenciosa — o pagamento é aprovado
+e a notificação simplesmente nunca chega.
+
+Confira com:
+
+```bash
+npm run doctor
+```
+
+```
+=== Webhook de pagamento ===
+  notification_url        https://abc123.ngrok-free.app/api/webhooks/mercadopago
+  ✓  Alcançável pela internet.
+  segredo do webhook      definido
+```
+
+A URL do túnel muda a cada reinício nas versões gratuitas: quando isso
+acontecer, atualize `NEXT_PUBLIC_APP_URL` **e** a URL cadastrada no painel do
+gateway.
+
+#### Credenciais de teste
+
+No painel do desenvolvedor: **Suas integrações** → sua aplicação → **Contas de
+teste** (crie uma de vendedor e uma de comprador). Use as credenciais da
+aplicação com o alternador em **Credenciais de teste**.
+
+**PIX não pode ser pago com credenciais de teste** — é limitação do gateway. O
+QR é gerado, o que valida a criação, mas não há como quitá-lo em sandbox. O
+caminho "aprovado" se testa com cartão de teste; o nome do titular determina o
+desfecho (`APRO` aprova, `OTHE` recusa, `CONT` deixa pendente). Os números de
+cartão estão na página *Cartões de teste* do painel.
 
 ## Painel administrativo
 
