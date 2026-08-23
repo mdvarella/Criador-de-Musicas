@@ -134,6 +134,23 @@ processo já mudou o status, a atualização não encontra linha e devolve `null
 É essa atomicidade que impede que um webhook reentregue aprove o mesmo pedido
 duas vezes.
 
+Três regras adicionais governam o grafo:
+
+1. **Retrabalho é permitido enquanto não há dinheiro.** De `AWAITING_PAYMENT` e
+   `PREVIEW_READY` dá para voltar a `STORY_PROCESSING` ou `PREVIEW_QUEUED` —
+   é atendimento normal quando o cliente não gostou da letra. Depois de `PAID`,
+   não: a música completa já foi paga.
+2. **Pagamento nunca é recusado pelo estado interno.** Todo estado de trabalho
+   pré-pagamento aceita virar `PAID`, inclusive `PREVIEW_GENERATING` e
+   `FAILED`. O dinheiro pode chegar no meio de um retrabalho, e registrá-lo é
+   obrigatório. A lista de estados elegíveis em `payment-service` é *derivada*
+   do grafo (`statusesThatCanBecome('PAID')` menos os que já contam como pagos),
+   para não divergir dele.
+3. **Serviço pago não roda com transição recusada.** `processStory`,
+   `generatePreview` e `generateFullSong` chamam `ensureCanEnter` antes de
+   qualquer leitura pesada, reserva ou chamada de provider. A recusa vira um
+   evento `operation_skipped` na linha do tempo do pedido.
+
 ## 5. Integrações externas
 
 | Provider | Serviço | Endpoints usados | Observações |

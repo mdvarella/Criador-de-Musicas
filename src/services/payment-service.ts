@@ -26,6 +26,7 @@ import {
 import type { OrderRow, PaymentRow } from '@/types/database';
 import type { Json, OrderStatus } from '@/types/domain';
 import { trackServerEvent } from './analytics-service';
+import { isPaid, statusesThatCanBecome } from './order-status';
 import { assertChargeableAmount } from './pricing-service';
 import { getSettings } from './settings-service';
 
@@ -321,13 +322,12 @@ async function applyApprovedPayment(
     return;
   }
 
-  const eligible: OrderStatus[] = [
-    'AWAITING_PAYMENT',
-    'PAYMENT_PROCESSING',
-    'PREVIEW_READY',
-    'STORY_PROCESSED',
-    'FAILED',
-  ];
+  // Derivado da máquina de estados, não escrito à mão: qualquer estado que
+  // possa virar PAID entra aqui automaticamente. Os que já contam como pagos
+  // saem, e é isso que impede a aprovação de ser aplicada duas vezes.
+  const eligible: OrderStatus[] = statusesThatCanBecome('PAID').filter(
+    (status) => !isPaid(status),
+  );
 
   const paidOrder = await updateOrderStatusIfIn(order.id, eligible, {
     status: 'PAID',

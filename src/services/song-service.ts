@@ -22,6 +22,7 @@ import { trackServerEvent } from './analytics-service';
 import { advanceOrderStatus } from './order-service';
 import { isPaid } from './order-status';
 import { getSettings } from './settings-service';
+import { ensureCanEnter } from './transition-guard';
 
 /**
  * Geração musical (Fases 4, 5 e 7).
@@ -34,7 +35,7 @@ import { getSettings } from './settings-service';
  */
 
 export async function generatePreview(orderId: string): Promise<void> {
-  const { order, songRequest, story } = await loadContext(orderId);
+  const order = await loadOrder(orderId);
   const settings = await getSettings();
 
   if (!settings.preview_enabled) {
@@ -42,6 +43,12 @@ export async function generatePreview(orderId: string): Promise<void> {
     await advanceOrderStatus(order, 'AWAITING_PAYMENT', { message: 'Prévia desabilitada' });
     return;
   }
+
+  // Antes de qualquer leitura pesada ou reserva: o pedido pode entrar em
+  // geração? Se não, nada mais acontece.
+  if (!(await ensureCanEnter(order, 'PREVIEW_GENERATING', 'geração da prévia'))) return;
+
+  const { songRequest, story } = await loadStory(order);
 
   const generation = await claimGeneration(order, 'PREVIEW', {
     prompt: story.music_generation_prompt,
@@ -83,7 +90,7 @@ export async function generatePreview(orderId: string): Promise<void> {
 }
 
 export async function generateFullSong(orderId: string): Promise<void> {
-  const { order, songRequest, story } = await loadContext(orderId);
+  const order = await loadOrder(orderId);
 
   // Trava dura: sem pagamento confirmado, não existe geração completa.
   if (!isPaid(order.status) || !order.paid_at) {
@@ -94,6 +101,11 @@ export async function generateFullSong(orderId: string): Promise<void> {
     );
   }
 
+  if (!(await ensureCanEnter(order, 'FULL_SONG_GENERATING', 'gravação da música completa'))) {
+    return;
+  }
+
+  const { songRequest, story } = await loadStory(order);
   const settings = await getSettings();
 
   const generation = await claimGeneration(order, 'FULL', {
@@ -141,31 +153,37 @@ export async function generateFullSong(orderId: string): Promise<void> {
   });
 }
 
-type GenerationContext = {
-  order: OrderRow;
-  songRequest: SongRequestRow;
-  story: StructuredStory;
-};
-
-async function loadContext(orderId: string): Promise<GenerationContext> {
+async function loadOrder(orderId: string): Promise<OrderRow> {
   const order = await findOrderById(orderId);
   if (!order) throw new AppError('NOT_FOUND', `pedido ${orderId} não existe`);
+  return order;
+}
 
-  const songRequest = await findSongRequestByOrderId(orderId);
+/**
+ * Carrega a interpretação da história.
+ *
+ * Separada de `loadOrder` de propósito: a guarda de transição precisa rodar
+ * ANTES desta leitura. Se a história ainda não foi interpretada, o erro é
+ * reprocessável — o job de interpretação pode estar na fila.
+ */
+async function loadStory(
+  order: OrderRow,
+): Promise<{ songRequest: SongRequestRow; story: StructuredStory }> {
+  const songRequest = await findSongRequestByOrderId(order.id);
   if (!songRequest?.structured_story) {
-    throw new AppError('CONFLICT', `história do pedido ${orderId} ainda não foi interpretada`, {
+    throw new AppError('CONFLICT', `história do pedido ${order.id} ainda não foi interpretada`, {
       retryable: true,
     });
   }
 
   const parsed = structuredStorySchema.safeParse(songRequest.structured_story);
   if (!parsed.success) {
-    throw new AppError('INTERNAL_ERROR', `história estruturada inválida no pedido ${orderId}`, {
+    throw new AppError('INTERNAL_ERROR', `história estruturada inválida no pedido ${order.id}`, {
       retryable: false,
     });
   }
 
-  return { order, songRequest, story: parsed.data };
+  return { songRequest, story: parsed.data };
 }
 
 /**

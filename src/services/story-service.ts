@@ -13,6 +13,7 @@ import {
 import type { Json } from '@/types/domain';
 import { advanceOrderStatus } from './order-service';
 import { getSettings } from './settings-service';
+import { ensureCanEnter } from './transition-guard';
 
 /**
  * Interpretação da história (Fase 3).
@@ -34,6 +35,10 @@ export async function processStory(orderId: string): Promise<void> {
     await scheduleNextStep(orderId);
     return;
   }
+
+  // Nada de chamar o modelo de texto se o pedido não pode entrar em
+  // processamento: seria custo em cima de um pedido em estado inválido.
+  if (!(await ensureCanEnter(order, 'STORY_PROCESSING', 'interpretação da história'))) return;
 
   const settings = await getSettings();
   await advanceOrderStatus(order, 'STORY_PROCESSING', { message: 'Lendo a história do cliente' });

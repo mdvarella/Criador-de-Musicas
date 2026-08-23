@@ -2,7 +2,11 @@ import 'server-only';
 import { AppError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { findCustomerById } from '@/repositories/customer-repository';
-import { listGenerationsByOrder, cancelAliveGenerations } from '@/repositories/generation-repository';
+import {
+  cancelAliveGenerations,
+  findReadyGeneration,
+  listGenerationsByOrder,
+} from '@/repositories/generation-repository';
 import { listNotificationEvents, listOrderEvents, recordOrderEvent } from '@/repositories/event-repository';
 import { enqueueJob, listJobsByOrder } from '@/repositories/job-repository';
 import {
@@ -21,7 +25,7 @@ import { findSongRequestByOrderId } from '@/repositories/song-request-repository
 import { mediaUrl } from '@/lib/signing';
 import type { OrderStatus } from '@/types/domain';
 import { getSettings } from './settings-service';
-import { statusesThatCanBecome } from './order-status';
+import { canTransition, statusesThatCanBecome } from './order-status';
 
 /**
  * Consultas e ações do painel.
@@ -104,6 +108,9 @@ export async function adminReprocessStory(
   const order = await findOrderById(orderId);
   if (!order) throw new AppError('NOT_FOUND', 'pedido não existe');
 
+  const refusal = refuseIfCannot(order.status, 'STORY_PROCESSING', 'reprocessar a história');
+  if (refusal) return refusal;
+
   const { updateSongRequest } = await import('@/repositories/song-request-repository');
   await updateSongRequest(orderId, {
     structured_story: null,
@@ -113,6 +120,15 @@ export async function adminReprocessStory(
     story_summary: null,
   });
 
+  // A letra vai mudar, então a prévia atual deixa de corresponder a ela.
+  // Mantê-la viva deixaria o pedido inconsistente: prévia de uma letra que não
+  // existe mais. Cancelar aqui também libera o índice único para a nova.
+  const cancelled = await cancelAliveGenerations(
+    orderId,
+    'PREVIEW',
+    `história reprocessada por ${actor}`,
+  );
+
   await updateOrderStatusIfIn(orderId, statusesThatCanBecome('STORY_PROCESSING'), {
     status: 'STORY_PROCESSING',
   });
@@ -120,12 +136,16 @@ export async function adminReprocessStory(
   const job = await enqueueJob({
     type: 'PROCESS_STORY',
     orderId,
-    dedupeKey: `process-story:${orderId}:${Date.now()}`,
+    dedupeKey: `process-story:${orderId}`,
   });
 
-  await audit(orderId, 'admin_reprocess_story', actor, { job_id: job?.id ?? null });
+  await audit(orderId, 'admin_reprocess_story', actor, {
+    job_id: job?.id ?? null,
+    cancelled_previews: String(cancelled),
+  });
 
-  return { ok: true, message: 'História enviada para reprocessamento.' };
+  if (!job) return { ok: true, message: alreadyRunning('reprocessamento') };
+  return { ok: true, message: 'História enviada para reprocessamento. A prévia será refeita.' };
 }
 
 /** Regera a prévia. Cancela a geração viva antes, liberando o índice único. */
@@ -133,6 +153,12 @@ export async function adminRegeneratePreview(
   orderId: string,
   actor: string,
 ): Promise<AdminActionResult> {
+  const order = await findOrderById(orderId);
+  if (!order) throw new AppError('NOT_FOUND', 'pedido não existe');
+
+  const refusal = refuseIfCannot(order.status, 'PREVIEW_QUEUED', 'regerar a prévia');
+  if (refusal) return refusal;
+
   const settings = await getSettings();
   await cancelAliveGenerations(orderId, 'PREVIEW', `regeneração solicitada por ${actor}`);
 
@@ -143,11 +169,13 @@ export async function adminRegeneratePreview(
   const job = await enqueueJob({
     type: 'GENERATE_PREVIEW',
     orderId,
-    dedupeKey: `generate-preview:${orderId}:${Date.now()}`,
+    dedupeKey: `generate-preview:${orderId}`,
     maxAttempts: settings.max_generation_attempts,
   });
 
   await audit(orderId, 'admin_regenerate_preview', actor, { job_id: job?.id ?? null });
+
+  if (!job) return { ok: true, message: alreadyRunning('geração de prévia') };
   return { ok: true, message: 'Nova prévia entrou na fila.' };
 }
 
@@ -168,6 +196,9 @@ export async function adminRegenerateFullSong(
     return { ok: false, message: 'Este pedido ainda não foi pago.' };
   }
 
+  const refusal = refuseIfCannot(order.status, 'FULL_SONG_QUEUED', 'regravar a música');
+  if (refusal) return refusal;
+
   const settings = await getSettings();
   await cancelAliveGenerations(orderId, 'FULL', `regeneração solicitada por ${actor}`);
 
@@ -178,11 +209,13 @@ export async function adminRegenerateFullSong(
   const job = await enqueueJob({
     type: 'GENERATE_FULL_SONG',
     orderId,
-    dedupeKey: `generate-full:${orderId}:${Date.now()}`,
+    dedupeKey: `generate-full:${orderId}`,
     maxAttempts: settings.max_generation_attempts,
   });
 
   await audit(orderId, 'admin_regenerate_full', actor, { job_id: job?.id ?? null });
+
+  if (!job) return { ok: true, message: alreadyRunning('gravação') };
   return { ok: true, message: 'Nova gravação entrou na fila.' };
 }
 
@@ -190,13 +223,25 @@ export async function adminResendDelivery(
   orderId: string,
   actor: string,
 ): Promise<AdminActionResult> {
+  const order = await findOrderById(orderId);
+  if (!order) throw new AppError('NOT_FOUND', 'pedido não existe');
+
+  // Reenviar entrega exige música pronta. Sem isso, o job falharia e o
+  // administrador teria recebido um "entrega reenviada" que não aconteceu.
+  const ready = await findReadyGeneration(orderId, 'FULL');
+  if (!ready) {
+    return { ok: false, message: 'A música completa deste pedido ainda não está pronta.' };
+  }
+
   const job = await enqueueJob({
     type: 'SEND_DELIVERY',
     orderId,
-    dedupeKey: `send-delivery:${orderId}:${Date.now()}`,
+    dedupeKey: `send-delivery:${orderId}`,
   });
 
   await audit(orderId, 'admin_resend_delivery', actor, { job_id: job?.id ?? null });
+
+  if (!job) return { ok: true, message: alreadyRunning('entrega') };
   return { ok: true, message: 'Entrega reenviada.' };
 }
 
@@ -238,6 +283,31 @@ export async function adminToggleReviewFlag(
   await audit(orderId, next ? 'admin_flagged' : 'admin_unflagged', actor, {});
 
   return { ok: true, message: next ? 'Pedido marcado para revisão.' : 'Marcação removida.' };
+}
+
+/**
+ * Recusa a ação quando a transição necessária não é permitida.
+ *
+ * Antes, a ação enfileirava o job de qualquer jeito e respondia "ok" — o
+ * administrador via sucesso enquanto nada acontecia, e o job ainda gastava com
+ * IA. Agora a recusa é explícita e diz o estado que impediu.
+ */
+function refuseIfCannot(
+  from: OrderStatus,
+  to: OrderStatus,
+  action: string,
+): AdminActionResult | null {
+  if (canTransition(from, to)) return null;
+
+  return {
+    ok: false,
+    message: `Não é possível ${action} com o pedido em ${from}.`,
+  };
+}
+
+/** Um job vivo com a mesma chave já existe: a ação é redundante, não um erro. */
+function alreadyRunning(what: string): string {
+  return `Já existe uma ${what} em andamento para este pedido. Aguarde a conclusão.`;
 }
 
 async function audit(

@@ -12,14 +12,29 @@ import type { OrderStatus } from '@/types/domain';
 const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   DRAFT: ['STORY_RECEIVED', 'CANCELLED', 'FAILED'],
   STORY_RECEIVED: ['STORY_PROCESSING', 'CANCELLED', 'FAILED'],
-  STORY_PROCESSING: ['STORY_PROCESSED', 'FAILED', 'CANCELLED'],
+  STORY_PROCESSING: ['STORY_PROCESSED', 'PAID', 'FAILED', 'CANCELLED'],
   // Sem prévia habilitada, o pedido vai direto para o checkout.
-  STORY_PROCESSED: ['PREVIEW_QUEUED', 'AWAITING_PAYMENT', 'FAILED', 'CANCELLED'],
-  PREVIEW_QUEUED: ['PREVIEW_GENERATING', 'FAILED', 'CANCELLED'],
-  PREVIEW_GENERATING: ['PREVIEW_READY', 'FAILED', 'CANCELLED'],
-  PREVIEW_READY: ['AWAITING_PAYMENT', 'PREVIEW_QUEUED', 'CANCELLED', 'FAILED'],
-  AWAITING_PAYMENT: ['PAYMENT_PROCESSING', 'PAID', 'CANCELLED', 'FAILED'],
+  STORY_PROCESSED: ['PREVIEW_QUEUED', 'AWAITING_PAYMENT', 'PAID', 'FAILED', 'CANCELLED'],
+  // Os estados de trabalho pré-pagamento aceitam PAID: o dinheiro pode chegar a
+  // qualquer momento, inclusive no meio de um retrabalho, e a confirmação de
+  // pagamento nunca pode ser recusada por causa do estado interno do pedido.
+  PREVIEW_QUEUED: ['PREVIEW_GENERATING', 'PAID', 'FAILED', 'CANCELLED'],
+  PREVIEW_GENERATING: ['PREVIEW_READY', 'PAID', 'FAILED', 'CANCELLED'],
+  PREVIEW_READY: ['AWAITING_PAYMENT', 'PREVIEW_QUEUED', 'STORY_PROCESSING', 'PAID', 'CANCELLED', 'FAILED'],
+  // Retrabalho antes do pagamento é atendimento normal: o cliente ouviu a
+  // prévia, não gostou da letra e pediu outra. Enquanto não há dinheiro
+  // envolvido, voltar para a interpretação da história é seguro.
+  AWAITING_PAYMENT: [
+    'PAYMENT_PROCESSING',
+    'PAID',
+    'STORY_PROCESSING',
+    'PREVIEW_QUEUED',
+    'CANCELLED',
+    'FAILED',
+  ],
   PAYMENT_PROCESSING: ['PAID', 'AWAITING_PAYMENT', 'CANCELLED', 'FAILED'],
+  // Depois de PAID não existe retrabalho de graça: a música completa já foi
+  // paga, e refazer letra ou prévia sairia do fluxo comercial.
   PAID: ['FULL_SONG_QUEUED', 'REFUNDED', 'FAILED'],
   FULL_SONG_QUEUED: ['FULL_SONG_GENERATING', 'FAILED', 'REFUNDED'],
   FULL_SONG_GENERATING: ['FULL_SONG_READY', 'FAILED', 'REFUNDED'],
@@ -27,11 +42,14 @@ const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   DELIVERY_PENDING: ['DELIVERED', 'FAILED', 'REFUNDED'],
   DELIVERED: ['REFUNDED'],
   // Um pedido que falhou pode voltar ao fluxo por ação administrativa.
+  // FAILED aceita PAID pelo mesmo motivo: o cliente pode ter pago um PIX
+  // gerado antes da falha, e o dinheiro precisa ser registrado de qualquer jeito.
   FAILED: [
     'STORY_PROCESSING',
     'PREVIEW_QUEUED',
     'FULL_SONG_QUEUED',
     'AWAITING_PAYMENT',
+    'PAID',
     'CANCELLED',
     'REFUNDED',
   ],
