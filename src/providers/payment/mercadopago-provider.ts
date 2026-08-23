@@ -47,6 +47,7 @@ export function mapMercadoPagoStatus(raw: string | null | undefined): PaymentSta
 
 type MercadoPagoPayment = {
   id: number | string;
+  live_mode?: boolean;
   status?: string;
   status_detail?: string;
   payment_method_id?: string;
@@ -187,6 +188,7 @@ export class MercadoPagoProvider implements PaymentProvider {
   }
 
   private toResult(payment: MercadoPagoPayment, fallbackAmountCents: number): PaymentResult {
+    this.assertNotLive(payment);
     const transactionData = payment.point_of_interaction?.transaction_data;
 
     return {
@@ -199,6 +201,7 @@ export class MercadoPagoProvider implements PaymentProvider {
         ? amountToCents(payment.transaction_amount)
         : fallbackAmountCents,
       approvedAt: payment.date_approved ?? null,
+      liveMode: payment.live_mode ?? null,
       ...(transactionData
         ? {
             pix: {
@@ -210,6 +213,27 @@ export class MercadoPagoProvider implements PaymentProvider {
           }
         : {}),
     };
+  }
+
+  /**
+   * Recusa dinheiro de verdade enquanto a trava não for liberada.
+   *
+   * Um token de produção colado no ambiente por engano cobraria de uma pessoa
+   * real — e não há como desfazer isso com um `git revert`. A checagem fica
+   * aqui, na fronteira com o gateway, para valer tanto na criação quanto na
+   * consulta do pagamento.
+   */
+  private assertNotLive(payment: MercadoPagoPayment): void {
+    if (payment.live_mode !== true) return;
+    if (serverEnv().MERCADO_PAGO_ALLOW_LIVE) return;
+
+    throw new AppError(
+      'PAYMENT_ERROR',
+      `pagamento ${payment.id} veio com live_mode=true (dinheiro real) e ` +
+        'MERCADO_PAGO_ALLOW_LIVE não está habilitada. Se as credenciais deveriam ser de ' +
+        'teste, troque-as. Se você já está em produção, defina MERCADO_PAGO_ALLOW_LIVE=true.',
+      { retryable: false },
+    );
   }
 
   private async request<T>(path: string, init: RequestInit): Promise<T> {

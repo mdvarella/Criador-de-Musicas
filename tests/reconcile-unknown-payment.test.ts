@@ -76,6 +76,7 @@ describe('conciliação de pagamento desconhecido', () => {
       method: 'pix',
       amountCents: 4990,
       approvedAt: null,
+      liveMode: false,
     });
 
     await reconcilePayment('mercadopago', '12345');

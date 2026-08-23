@@ -177,6 +177,7 @@ Lista completa e comentada em [`.env.example`](.env.example). As essenciais:
 | `ELEVENLABS_API_KEY` | em produção | Geração do áudio |
 | `MERCADO_PAGO_ACCESS_TOKEN` | em produção | Criação e consulta de pagamentos |
 | `MERCADO_PAGO_WEBHOOK_SECRET` | em produção | Validação da assinatura do webhook |
+| `MERCADO_PAGO_ALLOW_LIVE` | **em produção** | Trava de segurança: com `false`, pagamentos com dinheiro real são recusados |
 | `NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY` | opcional | Habilita o pagamento com cartão |
 | `MEDIA_SIGNING_SECRET` | sim | Assinatura das URLs de áudio |
 | `JOBS_WORKER_SECRET` | sim | Proteção do worker da fila |
@@ -471,6 +472,7 @@ cartão estão na página *Cartões de teste* do painel.
 - [ ] Migrations aplicadas e bucket `songs` privado
 - [ ] Webhook cadastrado no Mercado Pago com a chave secreta configurada
 - [ ] `USE_MOCK_PROVIDERS` **ausente ou `false`** em produção
+- [ ] `MERCADO_PAGO_ALLOW_LIVE=true` — sem isso, **nenhum pagamento real é aceito**
 - [ ] `ADMIN_ALLOWED_EMAILS` preenchido e usuários criados no Supabase Auth
 - [ ] `MEDIA_SIGNING_SECRET` e `JOBS_WORKER_SECRET` longos e distintos
 - [ ] Pagamento de teste concluído de ponta a ponta

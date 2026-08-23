@@ -173,6 +173,7 @@ vi.mock('@/providers/payment', () => ({
       method: 'pix',
       amountCents: state.gatewayAmountCents,
       approvedAt: '2026-08-22T12:00:00.000Z',
+      liveMode: false,
     });
 
     return provider;
@@ -269,5 +270,31 @@ describe('webhook de pagamento', () => {
 
   it('mantém os defaults de configuração usados no fluxo', () => {
     expect(DEFAULT_SETTINGS.max_generation_attempts).toBeGreaterThan(0);
+  });
+
+  /**
+   * Cenário de recuperação: o pedido já avançou para FULL_SONG_QUEUED mas o job
+   * não existe — o que acontece se o enfileiramento falhar por algo transitório
+   * logo depois da transição. Antes da correção, a reentrega do webhook não
+   * encontrava linha para transicionar e o job nunca era criado: cliente pago,
+   * pedido travado, sem recuperação automática.
+   */
+  it('cria o job na reentrega quando o pedido ficou em FULL_SONG_QUEUED sem job', async () => {
+    state.order.status = 'FULL_SONG_QUEUED';
+    state.order.paid_at = '2026-08-22T12:00:00.000Z';
+    expect(state.jobs).toHaveLength(0);
+
+    await handleMercadoPagoWebhook(buildNotification('12345', 'req-recuperacao'));
+
+    expect(state.jobs.filter((job) => job.type === 'GENERATE_FULL_SONG')).toHaveLength(1);
+  });
+
+  it('e não cria um segundo job quando já existe um vivo', async () => {
+    await handleMercadoPagoWebhook(buildNotification());
+    state.webhookEvents.clear();
+
+    await handleMercadoPagoWebhook(buildNotification('12345', 'req-outra'));
+
+    expect(state.jobs.filter((job) => job.type === 'GENERATE_FULL_SONG')).toHaveLength(1);
   });
 });

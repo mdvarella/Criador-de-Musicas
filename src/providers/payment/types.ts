@@ -40,6 +40,8 @@ export type PaymentResult = {
   method: string | null;
   amountCents: number;
   approvedAt: string | null;
+  /** true = dinheiro de verdade. null quando o gateway não informa. */
+  liveMode: boolean | null;
   pix?: {
     qrCode: string | null;
     qrCodeBase64: string | null;

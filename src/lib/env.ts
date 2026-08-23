@@ -58,6 +58,16 @@ const serverEnvSchema = z.object({
 
   MERCADO_PAGO_ACCESS_TOKEN: z.string().default(''),
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),
+  /**
+   * Trava de segurança da fase de testes. Enquanto false, qualquer pagamento
+   * que o gateway marque como `live_mode: true` é RECUSADO — é o que impede
+   * cobrar de alguém de verdade se um token de produção entrar no ambiente por
+   * engano. Precisa ser ligada explicitamente ao ir para produção.
+   */
+  MERCADO_PAGO_ALLOW_LIVE: z
+    .string()
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
 
   NOTIFICATION_EMAIL_PROVIDER: z.enum(['console', 'resend']).default('console'),
   RESEND_API_KEY: z.string().default(''),

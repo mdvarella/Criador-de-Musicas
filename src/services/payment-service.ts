@@ -347,6 +347,13 @@ async function applyApprovedPayment(
       order_id: order.id,
       payment_id: payment.provider_payment_id,
     });
+
+    // Aprovação já aplicada — mas isso NÃO significa que a geração foi
+    // enfileirada. Se o enqueue falhou por algo transitório logo depois da
+    // transição, o pedido ficou em FULL_SONG_QUEUED sem job, e esta reentrega é
+    // a única chance de recuperar. Cliente pago sem música é o pior desfecho
+    // possível, então checamos sempre.
+    await ensureFullSongQueued(order.id);
     return;
   }
 
@@ -363,24 +370,40 @@ async function applyApprovedPayment(
     properties: { amount_cents: fresh.amountCents, method: fresh.method ?? 'unknown' },
   });
 
-  const queued = await updateOrderStatusIfIn(order.id, ['PAID'], { status: 'FULL_SONG_QUEUED' });
-
-  if (queued) {
-    const settings = await getSettings();
-    // Segunda barreira contra duplicidade: a chave de deduplicação da fila.
-    await enqueueJob({
-      type: 'GENERATE_FULL_SONG',
-      orderId: order.id,
-      dedupeKey: `generate-full:${order.id}`,
-      maxAttempts: settings.max_generation_attempts,
-    });
-  }
+  await updateOrderStatusIfIn(order.id, ['PAID'], { status: 'FULL_SONG_QUEUED' });
+  await ensureFullSongQueued(order.id);
 
   await enqueueJob({
     type: 'SEND_NOTIFICATION',
     orderId: order.id,
     dedupeKey: `notify:payment_approved:${order.id}`,
     payload: { event_type: 'payment_approved' },
+  });
+}
+
+/**
+ * Garante que existe um job de música completa para o pedido.
+ *
+ * Idempotente por construção e chamada nos DOIS caminhos: quando a aprovação
+ * acaba de ser aplicada e quando ela já havia sido. A separação existe porque
+ * transição de status e enfileiramento são duas escritas distintas — a segunda
+ * pode falhar sozinha, e sem esta função o pedido ficaria pago e parado.
+ *
+ * Enfileirar sem ser quem fez a transição é seguro: a chave de deduplicação
+ * garante um job vivo por pedido, e `generateFullSong` ainda checa pagamento,
+ * transição de entrada e geração viva antes de gastar qualquer crédito.
+ */
+async function ensureFullSongQueued(orderId: string): Promise<void> {
+  const order = await findOrderById(orderId);
+  if (order?.status !== 'FULL_SONG_QUEUED') return;
+
+  const settings = await getSettings();
+
+  await enqueueJob({
+    type: 'GENERATE_FULL_SONG',
+    orderId,
+    dedupeKey: `generate-full:${orderId}`,
+    maxAttempts: settings.max_generation_attempts,
   });
 }
 

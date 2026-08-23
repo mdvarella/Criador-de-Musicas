@@ -31,6 +31,7 @@ export class MockPaymentProvider implements PaymentProvider {
       method: input.method,
       amountCents: input.amountCents,
       approvedAt: null,
+      liveMode: false,
       pix: {
         qrCode: `00020126MOCKPIX${id}5204000053039865802BR`,
         qrCodeBase64: null,
