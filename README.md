@@ -88,6 +88,8 @@ npm install
 cp .env.example .env.local
 ```
 
+No Windows (PowerShell), a última linha é `copy .env.example .env.local`.
+
 ## Configuração
 
 ### 1. Supabase
@@ -157,6 +159,9 @@ produção, música pronta e entregue, geração com erro e pedido recém-criado
 Tudo é marcado com `is_seed = true`, e o script **recusa rodar com
 `NODE_ENV=production`**.
 
+Não precisa do `npm run dev` rodando: o seed fala direto com o Supabase, lendo
+as credenciais do `.env.local`.
+
 ## Variáveis de ambiente
 
 Lista completa e comentada em [`.env.example`](.env.example). As essenciais:
@@ -181,11 +186,17 @@ Lista completa e comentada em [`.env.example`](.env.example). As essenciais:
 
 ```bash
 npm run dev        # http://localhost:3000
+npm run jobs:work  # worker da fila (ver abaixo — obrigatório em desenvolvimento)
 npm run build      # build de produção
 npm start          # serve o build
 npm run typecheck  # TypeScript sem emitir
 npm test           # suíte de testes
 ```
+
+> **Em desenvolvimento são dois terminais.** `npm run dev` sozinho serve as
+> páginas, mas não processa a fila: o pedido é criado e fica parado em
+> "compondo…" para sempre. Quem interpreta a história e gera a música é o
+> worker.
 
 ### Desenvolvimento sem gastar crédito
 
@@ -195,22 +206,58 @@ toca no player e pode ser baixado. O fluxo comercial inteiro roda offline.
 
 ### Rodando a fila localmente
 
-O cron da Vercel não existe em desenvolvimento. Dispare o worker à mão:
+Em produção quem aciona a fila é o cron da Vercel. Em desenvolvimento não existe
+cron, então o worker roda em um terminal próprio:
 
 ```bash
+npm run jobs:work
+```
+
+Funciona igual em Windows, macOS e Linux. O script chama a **mesma** função
+`runJobs()` que a rota HTTP chama — não é um caminho paralelo, é o mesmo worker
+acionado por um laço local. Ele imprime uma linha só quando processa algo:
+
+```
+Worker local ativo. Verificando a fila a cada 5s.
+[14:32:07] 1 job(s) · 1 ok · 812ms
+```
+
+Variações:
+
+```bash
+npm run jobs:work -- --once          # uma única passada, útil para depurar
+npm run jobs:work -- --interval=2    # verifica a cada 2 segundos
+```
+
+#### Acionando pela rota HTTP
+
+É como a produção funciona, e serve para conferir se a rota está de pé. Precisa
+do `JOBS_WORKER_SECRET`:
+
+```bash
+# macOS / Linux
 curl -H "Authorization: Bearer $JOBS_WORKER_SECRET" \
   http://localhost:3000/api/jobs/run
 ```
 
-Ou em laço, enquanto testa:
-
-```bash
-while true; do
-  curl -s -H "Authorization: Bearer $JOBS_WORKER_SECRET" \
-    http://localhost:3000/api/jobs/run > /dev/null
-  sleep 5
-done
+```powershell
+# Windows (PowerShell) — use curl.exe, não `curl`, que é um alias diferente
+curl.exe -H "Authorization: Bearer COLE_O_SEGREDO" http://localhost:3000/api/jobs/run
 ```
+
+Não esconda a resposta com `-s` nem com `| Out-Null`: é ela que diz o que houve.
+
+| Resposta | Significado |
+| --- | --- |
+| `{"claimed":1,"succeeded":1,...}` | processou |
+| `{"claimed":0,...}` | não havia job pendente |
+| `{"message":"não autorizado"}` | segredo errado, ou o `npm run dev` não foi reiniciado depois de editar o `.env.local` |
+| `{"message":"worker não configurado"}` | `JOBS_WORKER_SECRET` vazio no `.env.local` |
+
+Cada execução reserva até 3 jobs de uma vez, mas os jobs da fila são
+encadeados: o `GENERATE_PREVIEW` só nasce **durante** o processamento do
+`PROCESS_STORY`. Por isso uma chamada avulsa não leva o pedido até a prévia —
+são necessárias pelo menos duas. O `npm run jobs:work` resolve isso sozinho.
 
 ## Testes
 
@@ -386,17 +433,20 @@ npx localtunnel --port 3000     # ou ngrok http 3000
 
 Roteiro que define o MVP como pronto (item 43 da especificação):
 
-```bash
-# 1. Ambiente simulado, sem gastar crédito
-echo "USE_MOCK_PROVIDERS=true" >> .env.local
-npm run dev
+Garanta que `USE_MOCK_PROVIDERS=true` está no `.env.local` — sem isso o worker
+tenta usar OpenAI e ElevenLabs de verdade. Depois de editar o arquivo,
+**reinicie o `npm run dev`**: o Next só lê as variáveis na inicialização.
 
-# 2. Em outro terminal, mantenha a fila rodando
-while true; do
-  curl -s -H "Authorization: Bearer $JOBS_WORKER_SECRET" \
-    http://localhost:3000/api/jobs/run > /dev/null
-  sleep 5
-done
+Terminal 1:
+
+```bash
+npm run dev
+```
+
+Terminal 2:
+
+```bash
+npm run jobs:work
 ```
 
 1. Abra `http://localhost:3000` e clique em **Criar minha música**.

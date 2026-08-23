@@ -10,8 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:seed": "tsx scripts/seed.ts",
-    "db:reset-seed": "tsx scripts/seed.ts --reset"
+    "jobs:work": "tsx --conditions=react-server scripts/work.ts",
+    "db:seed": "tsx --conditions=react-server scripts/seed.ts",
+    "db:reset-seed": "tsx --conditions=react-server scripts/seed.ts --reset"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
