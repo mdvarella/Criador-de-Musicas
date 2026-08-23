@@ -33,3 +33,36 @@ export function maskPhoneBR(input: string): string {
   const head = rest.slice(0, rest.length - 4);
   return `(${ddd}) ${head}-${rest.slice(-4)}`;
 }
+
+/**
+ * Validação de CPF pelos dígitos verificadores.
+ *
+ * Feita aqui para o cliente receber o erro na hora, em vez de descobrir que o
+ * número está errado só quando o gateway recusar a criação do PIX.
+ */
+export function isValidCPF(input: string): boolean {
+  const digits = input.replace(/\D/g, '');
+  if (digits.length !== 11) return false;
+
+  // Sequências repetidas (000..., 111...) passam no cálculo, mas não são CPFs.
+  if (/^(\d)\1{10}$/.test(digits)) return false;
+
+  const checkDigit = (length: number): number => {
+    let sum = 0;
+    for (let i = 0; i < length; i += 1) {
+      sum += Number(digits[i]) * (length + 1 - i);
+    }
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  return checkDigit(9) === Number(digits[9]) && checkDigit(10) === Number(digits[10]);
+}
+
+export function formatCPF(input: string): string {
+  const digits = input.replace(/\D/g, '').slice(0, 11);
+  return digits
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
+}

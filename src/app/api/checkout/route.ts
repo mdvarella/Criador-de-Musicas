@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { AppError, toTechnicalMessage, toUserMessage } from '@/lib/errors';
 import { generateRequestId } from '@/lib/ids';
 import { logger } from '@/lib/logger';
 import { RATE_LIMITS, clientIpFrom, enforceRateLimit } from '@/lib/rate-limit';
+import { checkoutSchema } from '@/schemas/checkout';
 import { createCheckout } from '@/services/payment-service';
 
 export const runtime = 'nodejs';
@@ -15,21 +15,6 @@ export const dynamic = 'force-dynamic';
  * Repare no que o schema NÃO aceita: valor, plano ou preço. O montante é lido
  * do pedido no banco. O frontend só informa como o cliente quer pagar.
  */
-const checkoutSchema = z.object({
-  publicToken: z.string().min(8).max(64),
-  method: z.enum(['pix', 'card']),
-  /** Token do cartão gerado pelo SDK no browser — nunca o número do cartão. */
-  cardToken: z.string().max(200).optional(),
-  installments: z.number().int().min(1).max(12).optional(),
-  paymentMethodId: z.string().max(60).optional(),
-  issuerId: z.string().max(60).optional(),
-  identificationNumber: z
-    .string()
-    .max(20)
-    .transform((v) => v.replace(/\D/g, ''))
-    .optional(),
-});
-
 export async function POST(request: Request) {
   const requestId = generateRequestId();
   const log = logger.child({ request_id: requestId, route: 'POST /api/checkout' });

@@ -244,14 +244,18 @@ export async function reconcilePayment(
   providerPaymentId: string,
   known?: PaymentResult,
 ): Promise<void> {
-  const provider = await getPaymentProvider();
-  const fresh = known ?? (await provider.getPayment(providerPaymentId));
-
+  // Verificamos NOSSO registro primeiro, e só então consultamos o gateway.
+  // Além de economizar uma chamada, é o que faz o simulador de notificações do
+  // painel funcionar: ele envia um id fictício, que não conhecemos, e a
+  // resposta correta é ignorar em silêncio — não estourar um 404 do gateway.
   const existing = await findPaymentByProviderId(providerName, providerPaymentId);
   if (!existing) {
     logger.warn('payment.unknown_reference', { payment_id: providerPaymentId });
     return;
   }
+
+  const provider = await getPaymentProvider();
+  const fresh = known ?? (await provider.getPayment(providerPaymentId));
 
   const order = await findOrderById(existing.order_id);
   if (!order) {

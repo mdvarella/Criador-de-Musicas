@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { track } from '@/lib/analytics';
+import { formatCPF, isValidCPF } from '@/lib/format';
 
 type PixData = { qrCode: string | null; qrCodeBase64: string | null; expiresAt: string | null };
 
@@ -24,6 +25,8 @@ export function PixCheckout({
 }) {
   const router = useRouter();
   const [pix, setPix] = useState<PixData | null>(initialPix);
+  const [cpf, setCpf] = useState('');
+  const [cpfError, setCpfError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -52,6 +55,14 @@ export function PixCheckout({
   }, [pix, publicToken, router]);
 
   async function createPix() {
+    // O gateway exige o CPF do pagador no PIX. Validar aqui evita uma ida à
+    // rede só para voltar com recusa.
+    if (!isValidCPF(cpf)) {
+      setCpfError('Informe um CPF válido para gerar o PIX.');
+      return;
+    }
+
+    setCpfError(null);
     setLoading(true);
     setError(null);
 
@@ -59,7 +70,11 @@ export function PixCheckout({
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ publicToken, method: 'pix' }),
+        body: JSON.stringify({
+          publicToken,
+          method: 'pix',
+          identificationNumber: cpf.replace(/\D/g, ''),
+        }),
       });
 
       const body = (await response.json()) as {
@@ -99,12 +114,33 @@ export function PixCheckout({
 
   if (!pix) {
     return (
-      <div>
+      <div className="space-y-4">
+        <label className="block">
+          <span className="field-label">CPF</span>
+          <input
+            className="field-input"
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="000.000.000-00"
+            value={cpf}
+            aria-invalid={cpfError ? true : undefined}
+            onChange={(event) => {
+              setCpf(formatCPF(event.target.value));
+              setCpfError(null);
+            }}
+          />
+          <span className="mt-1 block text-xs text-ink-soft">
+            O banco pede o CPF de quem está pagando para liberar o PIX.
+          </span>
+          {cpfError ? <span className="field-error">{cpfError}</span> : null}
+        </label>
+
         <button type="button" onClick={createPix} disabled={loading} className="btn-primary w-full">
           {loading ? 'Gerando PIX…' : `Pagar ${priceFormatted} com PIX`}
         </button>
+
         {error ? (
-          <p role="alert" className="mt-3 text-sm text-wine-700">
+          <p role="alert" className="text-sm text-wine-700">
             {error}
           </p>
         ) : null}
