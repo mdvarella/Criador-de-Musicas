@@ -22,6 +22,7 @@ export function loadEnv(): void {
     if (!fs.existsSync(filePath)) continue;
 
     const parsed = new Map<string, string>();
+    const duplicated = new Set<string>();
 
     for (const rawLine of fs.readFileSync(filePath, 'utf8').split('\n')) {
       const line = rawLine.trim();
@@ -41,7 +42,19 @@ export function loadEnv(): void {
       }
 
       // Sobrescreve deliberadamente: a última linha do arquivo é a que vale.
+      if (parsed.has(key)) duplicated.add(key);
       parsed.set(key, value);
+    }
+
+    // Chave repetida é quase sempre engano — normalmente a linha vazia do
+    // `.env.example` que ficou para trás quando o valor real foi colado. Em
+    // silêncio, isso vira horas de depuração: já desligou a integração de
+    // música inteira uma vez.
+    if (duplicated.size > 0) {
+      console.warn(
+        `\n⚠  ${file}: chave(s) repetida(s) — ${[...duplicated].join(', ')}.\n` +
+          '   Vale a ÚLTIMA ocorrência de cada uma. Apague as linhas antigas para evitar surpresa.\n',
+      );
     }
 
     for (const [key, value] of parsed) {

@@ -187,6 +187,7 @@ Lista completa e comentada em [`.env.example`](.env.example). As essenciais:
 ```bash
 npm run dev        # http://localhost:3000
 npm run jobs:work  # worker da fila (ver abaixo — obrigatório em desenvolvimento)
+npm run doctor     # diagnóstico: variáveis, configuração e providers efetivos
 npm run build      # build de produção
 npm start          # serve o build
 npm run typecheck  # TypeScript sem emitir
@@ -198,11 +199,42 @@ npm test           # suíte de testes
 > "compondo…" para sempre. Quem interpreta a história e gera a música é o
 > worker.
 
+### Diagnóstico: qual provider está sendo usado?
+
+```bash
+npm run doctor
+```
+
+Imprime o ambiente efetivo, a configuração lida do banco e **qual provider cada
+serviço vai usar de verdade**, com o motivo da escolha. Nenhum segredo é
+exibido, apenas se está definido.
+
+É o primeiro comando a rodar quando "configurei e não pegou". Ele também aponta
+chaves repetidas no `.env.local` — a causa clássica, porque quem copia o
+`.env.example` herda linhas como `ELEVENLABS_API_KEY=` e cola o valor real mais
+abaixo. **Vale a última ocorrência de cada chave.**
+
+```
+  .env.local: 62 linhas, 24 chaves
+    ⚠  USE_MOCK_PROVIDERS aparece nas linhas 4, 62 — vale a linha 62
+
+  === Providers que serão usados ===
+  ⚠  USE_MOCK_PROVIDERS=true ignora o banco: TUDO roda em mock.
+  llm        mock · mock-lyricist-1
+  music      mock · mock-composer-1
+```
+
 ### Desenvolvimento sem gastar crédito
 
 Com `USE_MOCK_PROVIDERS=true`, o LLM e a geração musical usam implementações
 simuladas: a letra sai pronta e o áudio é um WAV sintetizado de verdade, que
 toca no player e pode ser baixado. O fluxo comercial inteiro roda offline.
+
+Essa variável é uma **chave geral**: quando verdadeira, ignora o `app_settings`
+e coloca os três serviços em mock de uma vez. Para integrar **um serviço por
+vez**, deixe-a em `false` e use os campos `active_*_provider` em
+`/admin/configuracoes` — assim dá para rodar música real com pagamento
+simulado, por exemplo.
 
 ### Rodando a fila localmente
 
