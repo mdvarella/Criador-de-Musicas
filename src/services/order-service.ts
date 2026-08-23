@@ -42,6 +42,7 @@ export async function createOrder(
     name: input.customer.firstName,
     email: input.customer.email,
     phone: normalizePhoneBR(input.customer.whatsapp),
+    // O telefone é a identidade; o e-mail, quando existe, é canal extra.
     acceptedTermsAt: now,
     acceptedPrivacyAt: now,
     marketingOptIn: input.customer.marketingOptIn,

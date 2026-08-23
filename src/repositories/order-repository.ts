@@ -183,3 +183,33 @@ export async function listOrdersByCustomerIds(
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
+
+/**
+ * Pedidos de um cliente, para a página de recuperação.
+ *
+ * Casa telefone E nome do destinatário: dois fatos, e o segundo não é público.
+ * Pedidos cancelados ficam de fora — não há o que recuperar neles.
+ */
+export async function findOrdersForRecovery(
+  phone: string,
+  recipientName: string,
+): Promise<OrderRow[]> {
+  const customer = unwrapMaybe(
+    await supabaseAdmin().from('customers').select('id').eq('phone', phone).maybeSingle(),
+    'customers.findByPhoneForRecovery',
+  );
+
+  if (!customer) return [];
+
+  return unwrapList(
+    await supabaseAdmin()
+      .from('orders')
+      .select('*')
+      .eq('customer_id', customer.id)
+      .ilike('recipient_name', recipientName)
+      .not('status', 'in', '("CANCELLED")')
+      .order('created_at', { ascending: false })
+      .limit(20),
+    'orders.findForRecovery',
+  );
+}

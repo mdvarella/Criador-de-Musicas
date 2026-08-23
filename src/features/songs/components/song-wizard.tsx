@@ -439,12 +439,13 @@ export function SongWizard() {
                 error={errors.whatsapp}
               />
               <TextField
-                label="E-mail"
+                label="E-mail (opcional)"
                 value={draft.email}
                 onChange={(v) => set('email', v)}
                 type="email"
                 inputMode="email"
                 autoComplete="email"
+                hint="Se você usa e-mail, mandamos o link por lá também."
                 error={errors.email}
               />
 

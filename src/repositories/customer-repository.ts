@@ -5,7 +5,8 @@ import { unwrap, unwrapMaybe } from './errors';
 
 export type CustomerInput = {
   name: string;
-  email: string;
+  /** Opcional: parte do público não usa e-mail. */
+  email?: string;
   phone: string;
   acceptedTermsAt: string;
   acceptedPrivacyAt: string;
@@ -13,15 +14,18 @@ export type CustomerInput = {
 };
 
 /**
- * O cliente não cria conta. Ele é identificado pelo e-mail, e um novo pedido do
- * mesmo e-mail reaproveita (e atualiza) o cadastro existente.
+ * O cliente não cria conta.
+ *
+ * A identidade é o WhatsApp: é o dado que todo cliente tem, lembra e usa. O
+ * e-mail é opcional e apenas complementa. Um novo pedido do mesmo número
+ * reaproveita e atualiza o cadastro existente.
  */
 export async function upsertCustomer(input: CustomerInput): Promise<CustomerRow> {
-  const email = input.email.trim().toLowerCase();
+  const email = input.email?.trim().toLowerCase() || null;
 
   const existing = unwrapMaybe(
-    await supabaseAdmin().from('customers').select('*').eq('email', email).maybeSingle(),
-    'customers.findByEmail',
+    await supabaseAdmin().from('customers').select('*').eq('phone', input.phone).maybeSingle(),
+    'customers.findByPhone',
   );
 
   if (existing) {
@@ -30,7 +34,8 @@ export async function upsertCustomer(input: CustomerInput): Promise<CustomerRow>
         .from('customers')
         .update({
           name: input.name,
-          phone: input.phone,
+          // Um e-mail informado agora não apaga o que já estava lá.
+          email: email ?? existing.email,
           accepted_terms_at: input.acceptedTermsAt,
           accepted_privacy_at: input.acceptedPrivacyAt,
           marketing_opt_in: input.marketingOptIn || existing.marketing_opt_in,

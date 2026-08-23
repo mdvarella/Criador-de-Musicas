@@ -13,6 +13,9 @@ export function SiteFooter() {
         </div>
 
         <nav className="flex flex-wrap gap-x-6 gap-y-2">
+          <Link href="/minhas-musicas" className="hover:text-wine-600">
+            Encontrar minha música
+          </Link>
           <Link href="/privacidade" className="hover:text-wine-600">
             Privacidade
           </Link>

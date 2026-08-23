@@ -69,8 +69,12 @@ export function OrderProgress({ initial }: { initial: PublicOrderView }) {
       <Shell recipientName={view.recipientName}>
         <h1 className="text-2xl sm:text-3xl">Pagamento confirmado 🎉</h1>
         <p className="mt-4 text-ink-soft">
-          Sua música completa já entrou em produção. Assim que ficar pronta, avisamos você por
-          WhatsApp e e-mail — e o link aparece aqui também.
+          Sua música completa já entrou em produção. O link aparece aqui assim que ficar pronta —
+          e você sempre pode voltar por{' '}
+          <Link href="/minhas-musicas" className="underline">
+            Encontrar minha música
+          </Link>
+          .
         </p>
         <PulsingNote />
       </Shell>
@@ -124,7 +128,11 @@ export function OrderProgress({ initial }: { initial: PublicOrderView }) {
       </p>
       <PulsingNote />
       <p className="mt-6 text-sm text-ink-soft">
-        Se preferir, feche a página: avisamos você por WhatsApp e e-mail quando estiver pronta.
+        Pode fechar a página se quiser. Para voltar, é só entrar em{' '}
+        <Link href="/minhas-musicas" className="underline">
+          Encontrar minha música
+        </Link>{' '}
+        com o seu WhatsApp e o nome de {view.recipientName}.
       </p>
     </Shell>
   );

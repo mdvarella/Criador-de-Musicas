@@ -74,10 +74,16 @@ export type SongFormValues = z.infer<typeof songFormSchema>;
 
 export const customerSchema = z.object({
   firstName: trimmed(2, 60, 'Informe seu primeiro nome.'),
+  /**
+   * E-mail é OPCIONAL: boa parte do público-alvo não usa. Quando vem em branco,
+   * o WhatsApp é o único canal — e é ele que identifica o cliente.
+   */
   email: z
     .string()
     .transform((v) => v.trim().toLowerCase())
-    .pipe(z.email('Informe um e-mail válido.')),
+    .pipe(z.email('Informe um e-mail válido.'))
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
   whatsapp: z
     .string()
     .transform((v) => v.replace(/\D/g, ''))

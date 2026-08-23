@@ -20,7 +20,8 @@ type Timestamps = { created_at: string };
 export type CustomerRow = Timestamps & {
   id: string;
   name: string;
-  email: string;
+  /** Opcional: parte do público não usa e-mail. A identidade é o telefone. */
+  email: string | null;
   phone: string;
   accepted_terms_at: string | null;
   accepted_privacy_at: string | null;

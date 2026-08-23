@@ -69,7 +69,7 @@ Entrega (/sua-musica/[delivery-token])   delivery_opened, song_downloaded
 
 | Tabela | Papel |
 | --- | --- |
-| `customers` | Quem comprou. Sem conta: identificado por e-mail. Guarda os consentimentos de LGPD. |
+| `customers` | Quem comprou. Sem conta: identificado pelo **WhatsApp** (o e-mail é opcional, porque parte do público não usa). Guarda os consentimentos de LGPD. |
 | `orders` | O pedido. Carrega o status, o preço travado e os dois tokens (público e de entrega). |
 | `song_requests` | A história crua e a interpretação do LLM (letra, direção, prompt) + custo da chamada. |
 | `generations` | Cada geração de áudio: provider, modelo, tentativas, caminho no storage, duração e custo. |

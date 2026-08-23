@@ -23,6 +23,9 @@ export const RATE_LIMITS = {
   orderStatus: { bucket: 'order_status', limit: 120, windowSeconds: 60 },
   analytics: { bucket: 'analytics', limit: 120, windowSeconds: 60 },
   adminLogin: { bucket: 'admin_login', limit: 10, windowSeconds: 60 * 5 },
+  // Consulta por telefone: apertado de propósito. É a defesa contra alguém
+  // varrer faixas de números tentando encontrar pedidos de terceiros.
+  orderRecovery: { bucket: 'order_recovery', limit: 8, windowSeconds: 60 * 15 },
 } as const satisfies Record<string, RateLimitRule>;
 
 function windowStart(windowSeconds: number): string {

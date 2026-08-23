@@ -102,8 +102,24 @@ export async function sendOrderNotification(
       continue;
     }
 
-    const provider = getNotificationProvider(channel);
     const to = channel === 'EMAIL' ? customer.email : customer.phone;
+
+    // Cliente sem e-mail é caso esperado, não erro: parte do público não usa.
+    // Registramos como SKIPPED para o painel mostrar que ninguém foi avisado
+    // por esse canal — e por quê.
+    if (!to) {
+      await recordNotificationEvent({
+        orderId,
+        channel,
+        eventType,
+        status: 'SKIPPED',
+        errorMessage: 'cliente não informou endereço para este canal',
+      });
+      logger.info('notification.no_address', { order_id: orderId, channel, event_type: eventType });
+      continue;
+    }
+
+    const provider = getNotificationProvider(channel);
 
     try {
       const result = await provider.send({

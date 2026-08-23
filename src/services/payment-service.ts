@@ -102,7 +102,11 @@ export async function createCheckout(input: CheckoutInput): Promise<CheckoutResu
     method: input.method,
     payer: {
       firstName: customer.name,
-      email: customer.email,
+      // O gateway exige um e-mail no pagador, mas o cliente pode não ter um.
+      // Nesses casos usamos um endereço do NOSSO domínio, único por pedido:
+      // é um identificador válido, rastreável no painel e que não finge ser
+      // um contato do cliente.
+      email: customer.email ?? fallbackPayerEmail(order.public_token),
       phone: customer.phone,
       identificationNumber: input.identificationNumber,
     },
@@ -378,6 +382,12 @@ async function applyApprovedPayment(
     dedupeKey: `notify:payment_approved:${order.id}`,
     payload: { event_type: 'payment_approved' },
   });
+}
+
+/** Endereço técnico por pedido, para quando o cliente não informa e-mail. */
+function fallbackPayerEmail(publicToken: string): string {
+  const domain = new URL(absoluteUrl('/')).hostname.replace(/^www\./, '');
+  return `pedido-${publicToken}@${domain}`;
 }
 
 function isPixStillValid(payment: PaymentRow): boolean {

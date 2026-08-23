@@ -131,6 +131,7 @@ O SQL está em `supabase/migrations/`, em ordem:
 | `0001_init.sql` | Enums, tabelas, índices e funções auxiliares |
 | `0002_rls_and_functions.sql` | RLS, claim atômico de jobs, bucket privado |
 | `0003_default_settings.sql` | Configurações operacionais padrão |
+| `0004_phone_identity.sql` | WhatsApp como identidade; e-mail opcional |
 
 **Via SQL Editor do Supabase:** cole e execute cada arquivo, na ordem.
 
@@ -460,6 +461,10 @@ npx localtunnel --port 3000     # ou ngrok http 3000
   mensagem acolhedora separada da mensagem técnica.
 - **LGPD**: consentimentos com data registrada, páginas de privacidade e termos,
   e histórias jamais usadas publicamente sem autorização explícita.
+- **Recuperação de pedido** (`/minhas-musicas`) exige WhatsApp **e** nome do
+  destinatário, tem rate limit apertado e responde de forma idêntica quando não
+  encontra — seja porque o número não existe, seja porque o nome não bate.
+  Distinguir os dois casos revelaria quais telefones têm pedido.
 
 ## Teste de ponta a ponta
 
