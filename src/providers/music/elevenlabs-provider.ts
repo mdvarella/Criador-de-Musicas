@@ -35,8 +35,8 @@ import type {
  *   3. A API não devolve a duração exata do áudio; usamos a duração solicitada.
  *   4. Não há seleção de voz por gênero na API de música. A preferência de voz
  *      do cliente é comunicada dentro do prompt/estilos, sem garantia dura.
- *   5. Cada seção do composition_plan aceita de 3s a 120s, com no máximo 30
- *      seções — o montador abaixo respeita esses limites.
+ *   5. Cada chunk do composition_plan aceita de 3s a 120s, com no máximo 30
+ *      chunks — o montador abaixo respeita esses limites.
  */
 
 const API_BASE = 'https://api.elevenlabs.io';
@@ -51,6 +51,8 @@ type ElevenLabsCompositionChunk = {
   duration_ms: number;
   positive_styles: string[];
   negative_styles: string[];
+  /** Quanto o modelo deve aderir ao texto da seção. */
+  context_adherence?: 'low' | 'medium' | 'high';
 };
 
 export class ElevenLabsMusicProvider implements MusicGenerationProvider {
@@ -118,7 +120,9 @@ export class ElevenLabsMusicProvider implements MusicGenerationProvider {
 
     const audio = await this.compose(
       {
-        composition_plan: { positive_global_styles: [], negative_global_styles: [], sections: chunks },
+        // O plano tem UM campo: `chunks`. Não existem estilos globais no nível
+        // do plano — o estilo é declarado por chunk.
+        composition_plan: { chunks },
         model_id: this.model,
         output_format: this.outputFormat,
       },
@@ -231,12 +235,19 @@ function clamp(value: number, min: number, max: number): number {
  * limites documentados (3s a 120s por seção, no máximo 30 seções).
  */
 export function buildCompositionChunks(sections: MusicSection[]): ElevenLabsCompositionChunk[] {
-  return sections.slice(0, MAX_SECTIONS).map((section) => ({
-    text: section.text.slice(0, 2000),
-    duration_ms: clamp(section.durationSeconds * 1000, MIN_SECTION_MS, MAX_SECTION_MS),
-    positive_styles: section.positiveStyles.filter(Boolean).slice(0, 50),
-    negative_styles: section.negativeStyles.filter(Boolean).slice(0, 50),
-  }));
+  return sections.slice(0, MAX_SECTIONS).map((section) => {
+    const text = section.text.trim().slice(0, 2000);
+
+    return {
+      text,
+      duration_ms: clamp(section.durationSeconds * 1000, MIN_SECTION_MS, MAX_SECTION_MS),
+      positive_styles: section.positiveStyles.filter(Boolean).slice(0, 50),
+      negative_styles: section.negativeStyles.filter(Boolean).slice(0, 50),
+      // Seção com letra precisa ser cantada como está escrita; seção
+      // instrumental não tem texto a que aderir.
+      ...(text ? { context_adherence: 'high' as const } : {}),
+    };
+  });
 }
 
 export function buildPreviewPrompt(input: MusicGenerationInput): string {

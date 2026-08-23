@@ -358,8 +358,16 @@ export function buildSections(
   story: StructuredStory,
   targetDurationSeconds: number,
 ): MusicSection[] {
-  const weights: Array<{ key: keyof StructuredStory['song_structure']; weight: number }> = [
-    { key: 'intro', weight: 0.08 },
+  // `instrumental` marca a seção que NÃO deve ser cantada. A introdução que o
+  // modelo de texto devolve é uma descrição de arranjo ("violão dedilhado,
+  // entrada suave da voz") — mandá-la como letra faria o motor musical cantar
+  // essa frase. Ela vira instrução de estilo, não texto cantado.
+  const weights: Array<{
+    key: keyof StructuredStory['song_structure'];
+    weight: number;
+    instrumental?: boolean;
+  }> = [
+    { key: 'intro', weight: 0.08, instrumental: true },
     { key: 'verse_1', weight: 0.2 },
     { key: 'chorus', weight: 0.22 },
     { key: 'verse_2', weight: 0.18 },
@@ -374,10 +382,12 @@ export function buildSections(
   ];
   const negative = ['imitação de artista específico', 'ruído', 'distorção agressiva'];
 
-  return weights.map(({ key, weight }) => ({
-    text: story.song_structure[key],
+  return weights.map(({ key, weight, instrumental }) => ({
+    text: instrumental ? '' : story.song_structure[key],
     durationSeconds: Math.min(Math.max(Math.round(targetDurationSeconds * weight), 3), 120),
-    positiveStyles: key === 'intro' ? [...positive, 'introdução instrumental'] : positive,
-    negativeStyles: negative,
+    positiveStyles: instrumental
+      ? [...positive, 'introdução instrumental', story.song_structure[key].slice(0, 120)]
+      : positive,
+    negativeStyles: instrumental ? [...negative, 'vocais'] : negative,
   }));
 }
