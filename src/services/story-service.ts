@@ -11,6 +11,7 @@ import {
   updateSongRequest,
 } from '@/repositories/song-request-repository';
 import type { Json } from '@/types/domain';
+import { assembleSungLyrics } from './lyrics';
 import { advanceOrderStatus } from './order-service';
 import { getSettings } from './settings-service';
 import { ensureCanEnter } from './transition-guard';
@@ -62,7 +63,10 @@ export async function processStory(orderId: string): Promise<void> {
 
   await updateSongRequest(orderId, {
     structured_story: result.story as unknown as Json,
-    lyrics: result.story.lyrics,
+    // Gravamos a letra montada a partir de `song_structure`, não o campo
+    // `lyrics` que o modelo escreve à parte: é a estrutura que vira áudio, e as
+    // duas versões podem divergir.
+    lyrics: assembleSungLyrics(result.story),
     music_direction: result.story.music_direction,
     music_generation_prompt: result.story.music_generation_prompt,
     story_summary: result.story.story_summary,

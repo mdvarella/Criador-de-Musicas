@@ -24,6 +24,7 @@ import { listPaymentsByOrder } from '@/repositories/payment-repository';
 import { findSongRequestByOrderId } from '@/repositories/song-request-repository';
 import { mediaUrl } from '@/lib/signing';
 import type { OrderStatus } from '@/types/domain';
+import { displayLyrics } from './lyrics';
 import { getSettings } from './settings-service';
 import { canTransition, statusesThatCanBecome } from './order-status';
 
@@ -84,7 +85,13 @@ export async function getOrderDetail(orderId: string) {
   return {
     order,
     customer,
-    songRequest,
+    // A letra exibida vem da mesma fonte que virou áudio.
+    songRequest: songRequest
+      ? {
+          ...songRequest,
+          lyrics: displayLyrics(songRequest.structured_story, songRequest.lyrics),
+        }
+      : null,
     generations: generationsWithAudio,
     payments,
     events,

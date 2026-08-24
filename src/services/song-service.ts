@@ -19,6 +19,7 @@ import { findSongRequestByOrderId } from '@/repositories/song-request-repository
 import type { GenerationRow, OrderRow, SongRequestRow } from '@/types/database';
 import type { GenerationType } from '@/types/domain';
 import { trackServerEvent } from './analytics-service';
+import { assembleSungLyrics } from './lyrics';
 import { advanceOrderStatus } from './order-service';
 import { isPaid } from './order-status';
 import { getSettings } from './settings-service';
@@ -110,7 +111,7 @@ export async function generateFullSong(orderId: string): Promise<void> {
 
   const generation = await claimGeneration(order, 'FULL', {
     prompt: story.music_generation_prompt,
-    lyrics: story.lyrics,
+    lyrics: assembleSungLyrics(story),
     maxAttempts: settings.max_generation_attempts,
   });
 
@@ -262,7 +263,7 @@ async function runGeneration(args: {
     generationId: generation.id,
     orderId: order.id,
     prompt: buildPrompt(order, story),
-    lyrics: type === 'PREVIEW' ? story.preview_hook : story.lyrics,
+    lyrics: type === 'PREVIEW' ? story.preview_hook : assembleSungLyrics(story),
     sections: type === 'FULL' ? buildSections(order, story, targetDurationSeconds) : undefined,
     targetDurationSeconds,
   };

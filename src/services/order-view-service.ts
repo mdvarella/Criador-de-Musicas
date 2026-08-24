@@ -11,6 +11,7 @@ import {
 import { findSongRequestByOrderId } from '@/repositories/song-request-repository';
 import { findLatestPendingPayment } from '@/repositories/payment-repository';
 import type { OrderStatus } from '@/types/domain';
+import { displayLyrics } from './lyrics';
 import { canAccessFullSong, customerLabel, isPaid } from './order-status';
 
 /**
@@ -141,7 +142,8 @@ export async function getDeliveryView(deliveryToken: string): Promise<DeliveryVi
     occasionLabel: labelFor(order.occasion.split(':')[0]),
     styleLabel: labelFor(order.music_style),
     toneLabel: labelFor(order.emotional_tone),
-    lyrics: songRequest?.lyrics ?? null,
+    // Derivada da estrutura, que é a mesma fonte usada para gerar o áudio.
+    lyrics: displayLyrics(songRequest?.structured_story, songRequest?.lyrics ?? null),
     audioUrl: mediaUrl(generation.id, 'full', 60 * 60 * 2),
     downloadUrl: `${mediaUrl(generation.id, 'full', 60 * 60 * 2)}&download=1`,
     durationSeconds: generation.duration_seconds,

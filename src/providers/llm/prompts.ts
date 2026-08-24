@@ -31,7 +31,9 @@ SOBRE A DIREÇÃO MUSICAL
 - "preview_hook" é o trecho curto e mais emocionante da música, contendo o nome do destinatário e parte do refrão. Ele é o que faz alguém querer comprar a música inteira.
 
 FORMATO DA LETRA
-Use marcadores de seção em português entre colchetes, como [Verso 1], [Refrão], [Ponte]. O campo "lyrics" deve conter a letra completa e formatada dessa maneira.`;
+- "song_structure" é a FONTE DA VERDADE: cada seção contém exatamente o texto que será cantado nela. É a partir dela que a música é produzida.
+- "intro" é a única exceção: descreva o arranjo da introdução instrumental, sem letra, porque nada dela é cantado.
+- "lyrics" deve ser a junção fiel das seções cantadas de "song_structure", com marcadores entre colchetes como [Verso 1], [Refrão], [Ponte]. NÃO escreva uma letra diferente ali: o cliente lê esse texto enquanto ouve a música, e qualquer divergência aparece como erro para ele.`;
 
 function detailLine(label: string, value: string | undefined): string | null {
   if (!value || !value.trim()) return null;
