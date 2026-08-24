@@ -17,6 +17,7 @@ const SECRET_KEYS = [
   'SUPABASE_SERVICE_ROLE_KEY',
   'OPENAI_API_KEY',
   'ELEVENLABS_API_KEY',
+  'FAL_KEY',
   'MERCADO_PAGO_ACCESS_TOKEN',
   'MERCADO_PAGO_WEBHOOK_SECRET',
   'MEDIA_SIGNING_SECRET',
@@ -30,6 +31,7 @@ const PLAIN_KEYS = [
   'SUPABASE_STORAGE_BUCKET',
   'OPENAI_MODEL',
   'ELEVENLABS_MUSIC_MODEL',
+  'MINIMAX_MUSIC_MODEL',
   'USE_MOCK_PROVIDERS',
   'ADMIN_ALLOWED_EMAILS',
 ];
@@ -57,6 +59,7 @@ async function main() {
     for (const key of [
       'active_llm_provider',
       'active_music_provider',
+      'active_preview_music_provider',
       'active_payment_provider',
       'payment_methods',
       'preview_enabled',

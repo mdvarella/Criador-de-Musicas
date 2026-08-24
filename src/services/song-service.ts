@@ -216,7 +216,7 @@ async function claimGeneration(
     return alive;
   }
 
-  const provider = await getMusicProvider();
+  const provider = await getMusicProvider(type);
 
   try {
     return await insertGeneration({
@@ -248,7 +248,7 @@ async function runGeneration(args: {
   targetDurationSeconds: number;
 }): Promise<void> {
   const { order, story, generation, type, targetDurationSeconds } = args;
-  const provider = await getMusicProvider();
+  const provider = await getMusicProvider(type);
   const storage = getStorageProvider();
 
   await updateGeneration(generation.id, {

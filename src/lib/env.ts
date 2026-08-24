@@ -56,6 +56,16 @@ const serverEnvSchema = z.object({
   ELEVENLABS_MUSIC_MODEL: z.string().default('music_v2'),
   ELEVENLABS_OUTPUT_FORMAT: z.string().default('mp3_44100_128'),
 
+  /** MiniMax Music, hospedado na fal. */
+  FAL_KEY: z.string().default(''),
+  MINIMAX_MUSIC_MODEL: z.string().default('fal-ai/minimax-music/v2'),
+  /**
+   * Base configurável de propósito: não consegui confirmar esta URL na fonte
+   * oficial (o site da fal está inacessível a partir deste ambiente), então um
+   * eventual erro se corrige por variável de ambiente, sem novo deploy.
+   */
+  FAL_BASE_URL: z.string().default('https://fal.run'),
+
   MERCADO_PAGO_ACCESS_TOKEN: z.string().default(''),
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),
   /**

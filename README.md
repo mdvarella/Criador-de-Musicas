@@ -175,6 +175,7 @@ Lista completa e comentada em [`.env.example`](.env.example). As essenciais:
 | `SUPABASE_SERVICE_ROLE_KEY` | sim | Acesso do servidor (ignora RLS) |
 | `OPENAI_API_KEY` | em produção | Interpretação da história e letra |
 | `ELEVENLABS_API_KEY` | em produção | Geração do áudio |
+| `FAL_KEY` | se usar MiniMax | Provider musical alternativo |
 | `MERCADO_PAGO_ACCESS_TOKEN` | em produção | Criação e consulta de pagamentos |
 | `MERCADO_PAGO_WEBHOOK_SECRET` | em produção | Validação da assinatura do webhook |
 | `MERCADO_PAGO_ALLOW_LIVE` | **em produção** | Trava de segurança: com `false`, pagamentos com dinheiro real são recusados |
@@ -330,10 +331,33 @@ interface MusicGenerationProvider {
 | Interface | Implementações | Chave de configuração |
 | --- | --- | --- |
 | `LLMProvider` | `OpenAIProvider`, `MockLLMProvider` | `active_llm_provider` |
-| `MusicGenerationProvider` | `ElevenLabsMusicProvider`, `MockMusicProvider` | `active_music_provider` |
+| `MusicGenerationProvider` | `ElevenLabsMusicProvider`, `MinimaxMusicProvider`, `MockMusicProvider` | `active_music_provider` |
 | `PaymentProvider` | `MercadoPagoProvider`, `MockPaymentProvider` | `active_payment_provider` |
 | `StorageProvider` | `SupabaseStorageProvider` | — |
 | `NotificationProvider` | `ConsoleNotificationProvider`, `ResendEmailProvider`, WhatsApp (preparado) | `NOTIFICATION_EMAIL_PROVIDER` |
+
+### Comparando ElevenLabs e MiniMax
+
+Dois providers musicais coexistem, para você ouvir os dois e decidir:
+
+| | ElevenLabs | MiniMax (via fal) |
+| --- | --- | --- |
+| Custo da música completa (150s) | ~US$ 0,37 | ~US$ 0,03 |
+| Controle de duração | sim (`music_length_ms`) | **não** |
+| Como recebe a letra | seção a seção (`composition_plan.chunks`) | letra inteira (`lyrics_prompt`) |
+| Treino licenciado | sim | não declarado |
+
+**O MiniMax não controla duração** — o modelo decide o tamanho a partir da
+letra. Uma prévia sairia com tamanho de música inteira, entregando o produto sem
+cobrar. Por isso existe `active_preview_music_provider`: deixe-o em `elevenlabs`
+enquanto a música completa estiver em `minimax`.
+
+```
+active_music_provider          minimax      ← música completa, barata
+active_preview_music_provider  elevenlabs   ← prévia, com duração controlada
+```
+
+Vazio significa "o mesmo da música completa".
 
 ### Adicionando um provider musical
 

@@ -157,6 +157,7 @@ Três regras adicionais governam o grafo:
 | --- | --- | --- | --- |
 | `LLMProvider` | OpenAI Responses API | `POST /v1/responses` com `text.format = json_schema` (strict) | A saída é revalidada com Zod mesmo com Structured Outputs. |
 | `MusicGenerationProvider` | Eleven Music | `POST /v1/music` (`prompt` ou `composition_plan.chunks`, mutuamente exclusivos) | **Síncrono**: o áudio volta no corpo. Não há consulta de status por id. |
+| `MusicGenerationProvider` | MiniMax Music (fal) | `POST /{modelo}` com `prompt` + `lyrics_prompt` | Devolve URL, não bytes. **Não controla duração** — daí o provider separado de prévia. |
 | `PaymentProvider` | Mercado Pago | `POST /v1/payments`, `GET /v1/payments/{id}` | `X-Idempotency-Key` obrigatório na criação; webhook validado por HMAC-SHA256. |
 | `StorageProvider` | Supabase Storage | bucket privado `songs` | Nenhum áudio tem URL pública. |
 | `NotificationProvider` | Console (dev) / Resend (prod) | `POST /emails` | WhatsApp preparado, ainda não habilitado. |

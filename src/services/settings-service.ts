@@ -20,6 +20,13 @@ export const settingsSchema = z.object({
   preview_duration_seconds: z.number().int().min(5).max(60).default(15),
   full_song_duration_seconds: z.number().int().min(30).max(600).default(150),
   active_music_provider: z.string().default('elevenlabs'),
+  /**
+   * Provider da PRÉVIA, quando precisa ser diferente do da música completa.
+   * Vazio significa "o mesmo". Existe porque nem todo provider controla
+   * duração: o MiniMax decide o tamanho sozinho, e uma prévia com tamanho de
+   * música inteira entregaria o produto de graça.
+   */
+  active_preview_music_provider: z.string().default(''),
   active_llm_provider: z.string().default('openai'),
   active_payment_provider: z.string().default('mercadopago'),
   max_generation_attempts: z.number().int().min(1).max(10).default(3),
@@ -28,6 +35,8 @@ export const settingsSchema = z.object({
   llm_cost_per_1m_input_tokens_usd: z.number().min(0).default(1.25),
   llm_cost_per_1m_output_tokens_usd: z.number().min(0).default(10),
   music_cost_per_minute_usd: z.number().min(0).default(0.3),
+  /** O MiniMax cobra por geração, não por minuto. */
+  minimax_cost_per_generation_usd: z.number().min(0).default(0.03),
   payment_fee_percent: z.number().min(0).max(100).default(4.99),
 });
 

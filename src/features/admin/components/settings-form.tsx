@@ -59,8 +59,20 @@ const FIELDS: FieldDef[] = [
   {
     key: 'active_music_provider',
     label: 'Provider de música',
-    hint: 'elevenlabs | mock',
+    hint: 'elevenlabs | minimax | mock',
     kind: 'text',
+  },
+  {
+    key: 'active_preview_music_provider',
+    label: 'Provider da prévia',
+    hint: 'Vazio = o mesmo da música. Use elevenlabs aqui se a música for minimax: o MiniMax não controla duração e a prévia sairia inteira.',
+    kind: 'text',
+  },
+  {
+    key: 'minimax_cost_per_generation_usd',
+    label: 'Custo por geração no MiniMax (USD)',
+    hint: 'O MiniMax cobra por geração, não por minuto.',
+    kind: 'number',
   },
   {
     key: 'active_payment_provider',
