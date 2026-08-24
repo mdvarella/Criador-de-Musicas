@@ -50,7 +50,7 @@ async function main() {
   }
 
   console.log('\n=== Configuração no banco (app_settings) ===');
-  let settings;
+  let settings: Awaited<ReturnType<typeof import('../src/services/settings-service')['getSettings']>> | undefined;
   try {
     const { getSettings } = await import('../src/services/settings-service');
     settings = await getSettings({ fresh: true });
@@ -58,6 +58,7 @@ async function main() {
       'active_llm_provider',
       'active_music_provider',
       'active_payment_provider',
+      'payment_methods',
       'preview_enabled',
       'preview_duration_seconds',
       'max_generation_attempts',
@@ -69,6 +70,9 @@ async function main() {
   } catch (error) {
     console.log('  ⚠  não foi possível ler:', error instanceof Error ? error.message : error);
   }
+
+  console.log('\n=== Checkout ===');
+  reportCheckout(settings);
 
   console.log('\n=== Webhook de pagamento ===');
   reportWebhook();
@@ -93,6 +97,47 @@ async function report(kind: string, resolve: () => Promise<{ name: string; model
     console.log(`  ${kind.padEnd(10)} ${provider.name}${model}`);
   } catch (error) {
     console.log(`  ${kind.padEnd(10)} ⚠  ${error instanceof Error ? error.message : error}`);
+  }
+}
+
+/**
+ * Reproduz a condição que a página de checkout usa para decidir se cada bloco
+ * de pagamento aparece.
+ *
+ * Sem isso, "o formulário do cartão não carrega" é indistinguível de "o bloco do
+ * cartão nem foi renderizado" — e os dois têm causas completamente diferentes.
+ */
+function reportCheckout(settings: { payment_methods: string[] } | undefined) {
+  const publicKey = process.env.NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY || '';
+
+  if (!settings) {
+    console.log('  ⚠  configuração não lida acima: impossível dizer o que a página mostra.');
+    console.log(
+      `  public key do gateway   ${publicKey ? 'definida' : '⚠  AUSENTE'}`,
+    );
+    return;
+  }
+
+  const methods = settings.payment_methods;
+
+  console.log(`  métodos habilitados     ${methods.length ? methods.join(', ') : '(nenhum)'}`);
+  console.log(
+    `  public key do gateway   ${
+      publicKey ? `${publicKey.slice(0, 12)}… (${publicKey.length} caracteres)` : '⚠  AUSENTE'
+    }`,
+  );
+
+  const pixVisible = methods.includes('pix');
+  const cardVisible = methods.includes('card') && publicKey !== '';
+
+  console.log(`  bloco PIX na página     ${pixVisible ? '✓ aparece' : '✗ NÃO aparece'}`);
+  console.log(`  bloco cartão na página  ${cardVisible ? '✓ aparece' : '✗ NÃO aparece'}`);
+
+  if (!cardVisible) {
+    const reason = !methods.includes('card')
+      ? "'card' não está em payment_methods (ajuste em /admin/configuracoes)"
+      : 'NEXT_PUBLIC_MERCADO_PAGO_PUBLIC_KEY está vazia no .env.local';
+    console.log(`     motivo: ${reason}`);
   }
 }
 
