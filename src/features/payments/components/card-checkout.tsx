@@ -53,6 +53,9 @@ export function CardCheckout({
 
   useEffect(() => {
     let cancelled = false;
+    // Referência local ao controller: `controllerRef` só é preenchido quando a
+    // criação resolve, e a limpeza pode rodar antes disso.
+    let localController: BrickController | null = null;
 
     async function mount() {
       try {
@@ -102,6 +105,18 @@ export function CardCheckout({
           },
         });
 
+        localController = controller;
+
+        // O efeito foi cancelado enquanto a criação acontecia (o Strict Mode do
+        // React faz exatamente isso em desenvolvimento). Desmonta o que acabou
+        // de nascer, senão ele fica ocupando o container e a montagem seguinte
+        // não consegue renderizar o formulário.
+        if (cancelled) {
+          controller.unmount();
+          localController = null;
+          return;
+        }
+
         controllerRef.current = controller;
       } catch {
         if (!cancelled) {
@@ -114,8 +129,18 @@ export function CardCheckout({
 
     return () => {
       cancelled = true;
+
+      // `localController` cobre o caso da criação ainda em voo; `controllerRef`
+      // cobre a montagem que chegou a concluir.
+      localController?.unmount();
       controllerRef.current?.unmount();
+      localController = null;
       controllerRef.current = null;
+
+      // O SDK nem sempre limpa o que injetou. Sem esvaziar o container, a
+      // remontagem encontra um resto de DOM e falha em silêncio.
+      const container = document.getElementById(CONTAINER_ID);
+      if (container) container.innerHTML = '';
     };
   }, [amountCents, publicKey, publicToken, router]);
 
