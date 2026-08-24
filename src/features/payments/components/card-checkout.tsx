@@ -18,6 +18,9 @@ import { centsToAmount } from '@/lib/money';
 
 type BrickController = { unmount: () => void };
 
+/** O SDK entrega um objeto de erro com causa e mensagem; formatos variam. */
+type BrickError = { message?: string; cause?: string; type?: string };
+
 type MercadoPagoSdk = {
   bricks: () => {
     create: (
@@ -57,6 +60,14 @@ export function CardCheckout({
     // criação resolve, e a limpeza pode rodar antes disso.
     let localController: BrickController | null = null;
 
+    // Sem isto, uma falha que não dispara `onError` deixa o cliente olhando
+    // "Carregando…" para sempre, sem alternativa oferecida.
+    const timeout = setTimeout(() => {
+      if (cancelled) return;
+      console.error('[cartão] o formulário não ficou pronto em 15s.');
+      setError('O formulário do cartão está demorando. Se preferir, use o PIX acima.');
+    }, 15_000);
+
     async function mount() {
       try {
         await loadSdk();
@@ -67,9 +78,19 @@ export function CardCheckout({
           initialization: { amount: centsToAmount(amountCents) },
           customization: { visual: { style: { theme: 'default' } } },
           callbacks: {
-            onReady: () => setReady(true),
-            onError: () =>
-              setError('Não conseguimos carregar o formulário do cartão. Tente o PIX.'),
+            onReady: () => {
+              clearTimeout(timeout);
+              setReady(true);
+            },
+            onError: (brickError: BrickError) => {
+              clearTimeout(timeout);
+
+              // O motivo técnico vai para o console — é o que torna a falha
+              // diagnosticável. O cliente continua vendo texto acolhedor.
+              console.error('[cartão] o gateway recusou inicializar o formulário:', brickError);
+
+              setError('Não conseguimos carregar o formulário do cartão. Tente o PIX.');
+            },
             onSubmit: async (formData: {
               token?: string;
               installments?: number;
@@ -118,8 +139,10 @@ export function CardCheckout({
         }
 
         controllerRef.current = controller;
-      } catch {
+      } catch (error) {
+        clearTimeout(timeout);
         if (!cancelled) {
+          console.error('[cartão] falha ao montar o formulário:', error);
           setError('Não conseguimos carregar o pagamento com cartão. Tente o PIX.');
         }
       }
@@ -129,6 +152,7 @@ export function CardCheckout({
 
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
 
       // `localController` cobre o caso da criação ainda em voo; `controllerRef`
       // cobre a montagem que chegou a concluir.
