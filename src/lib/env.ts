@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AppError } from './errors';
 
 /**
  * Variáveis públicas.
@@ -117,11 +118,21 @@ export function resetServerEnvCache(): void {
  * Falha cedo e com mensagem clara quando um segredo obrigatório não existe.
  * Preferimos quebrar na inicialização do provider a quebrar no meio do pedido.
  */
+/**
+ * Lê uma variável obrigatória de integração.
+ *
+ * A falha é declarada NÃO reprocessável de propósito: chave ausente é
+ * configuração, não instabilidade. Como `Error` comum, a fila classificava
+ * isso como transitório e queimava todas as tentativas do job esperando um
+ * arquivo `.env` mudar sozinho.
+ */
 export function requireEnv(key: keyof ServerEnv): string {
   const value = serverEnv()[key];
   if (typeof value !== 'string' || value.trim() === '') {
-    throw new Error(
+    throw new AppError(
+      'INTERNAL_ERROR',
       `Variável de ambiente ausente: ${key}. Configure-a antes de usar esta integração.`,
+      { retryable: false },
     );
   }
   return value;

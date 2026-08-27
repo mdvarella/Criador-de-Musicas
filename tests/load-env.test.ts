@@ -92,3 +92,28 @@ describe('carregamento do .env para scripts', () => {
     expect(() => loadEnv()).not.toThrow();
   });
 });
+
+/**
+ * Chave ausente é configuração, não instabilidade.
+ *
+ * Como `Error` comum, a fila classificava a falta de uma chave como transitória
+ * e gastava todas as tentativas do job esperando um arquivo `.env` mudar
+ * sozinho entre um retry e outro.
+ */
+describe('requireEnv', () => {
+  it('marca variável ausente como não reprocessável', async () => {
+    const { requireEnv } = await import('@/lib/env');
+    const { AppError } = await import('@/lib/errors');
+
+    process.env.FAL_KEY = '';
+
+    try {
+      requireEnv('FAL_KEY');
+      expect.unreachable('deveria ter recusado a chave vazia');
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as InstanceType<typeof AppError>).retryable).toBe(false);
+      expect((error as Error).message).toContain('FAL_KEY');
+    }
+  });
+});
