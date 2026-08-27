@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { canTransition, isPaid, statusesThatCanBecome } from '@/services/order-status';
+import {
+  canTransition,
+  canTransitionAsAdmin,
+  isPaid,
+  statusesThatCanBecome,
+} from '@/services/order-status';
 import type { OrderStatus } from '@/types/domain';
 
 /**
@@ -15,7 +20,7 @@ const providerCalls = { llm: 0, music: 0 };
 let order: { id: string; status: OrderStatus; paid_at: string | null; [k: string]: unknown };
 let events: string[];
 let jobs: Array<{ type: string; dedupe_key: string | null }>;
-let generations: Array<{ type: 'PREVIEW' | 'FULL'; status: string }>;
+let generations: Array<{ id?: string; type: 'PREVIEW' | 'FULL'; status: string }>;
 
 vi.mock('@/services/settings-service', async () => {
   const actual = await vi.importActual<typeof import('@/services/settings-service')>(
@@ -73,7 +78,9 @@ vi.mock('@/repositories/job-repository', () => ({
 vi.mock('@/repositories/generation-repository', () => ({
   ALIVE_GENERATION_STATUSES: ['QUEUED', 'RUNNING', 'READY'],
   findAliveGeneration: async () => null,
-  findReadyGeneration: async () => null,
+  findReadyGeneration: async (_orderId: string, type: 'PREVIEW' | 'FULL') =>
+    generations.find((generation) => generation.type === type && generation.status === 'READY') ??
+    null,
   insertGeneration: async () => ({
     id: 'gen-1',
     order_id: 'order-1',
@@ -125,9 +132,12 @@ vi.mock('@/providers/music', () => ({
 
 const { processStory } = await import('@/services/story-service');
 const { generatePreview, generateFullSong } = await import('@/services/song-service');
-const { adminRegeneratePreview, adminReprocessStory, adminResendDelivery } = await import(
-  '@/services/order-admin-service'
-);
+const {
+  adminRegenerateFullSong,
+  adminRegeneratePreview,
+  adminReprocessStory,
+  adminResendDelivery,
+} = await import('@/services/order-admin-service');
 
 beforeEach(() => {
   providerCalls.llm = 0;
@@ -282,6 +292,78 @@ describe('pagamento nunca é recusado pelo estado interno', () => {
     for (const status of ['PAID', 'FULL_SONG_READY', 'DELIVERED'] as OrderStatus[]) {
       expect(canTransition(status, 'STORY_PROCESSING')).toBe(false);
       expect(canTransition(status, 'PREVIEW_QUEUED')).toBe(false);
+    }
+  });
+});
+
+/**
+ * Regravar depois da entrega.
+ *
+ * O cliente pagou, ouviu e não gostou. Antes disso o painel respondia
+ * "não é possível regravar a música com o pedido em DELIVERED" e o atendimento
+ * ficava sem saída nenhuma. A liberação é só do painel: nenhum job ou webhook
+ * consegue tirar um pedido de DELIVERED sozinho.
+ */
+describe('regravação depois da entrega', () => {
+  it('o painel regrava a música de um pedido já entregue', async () => {
+    order.status = 'DELIVERED';
+    order.paid_at = '2026-08-23T12:00:00.000Z';
+    generations = [{ id: 'gen-full-1', type: 'FULL', status: 'READY' }];
+
+    const result = await adminRegenerateFullSong('order-1', 'admin@exemplo.com.br');
+
+    expect(result.ok).toBe(true);
+    expect(order.status).toBe('FULL_SONG_QUEUED');
+    expect(jobs.map((job) => job.type)).toContain('GENERATE_FULL_SONG');
+    // A gravação anterior sai do caminho: o banco só admite uma viva por tipo.
+    expect(generations[0]!.status).toBe('CANCELLED');
+  });
+
+  it('regrava também a partir de FULL_SONG_READY e DELIVERY_PENDING', async () => {
+    for (const status of ['FULL_SONG_READY', 'DELIVERY_PENDING'] as OrderStatus[]) {
+      jobs = [];
+      order = { id: 'order-1', status, paid_at: '2026-08-23T12:00:00.000Z' };
+
+      const result = await adminRegenerateFullSong('order-1', 'admin@exemplo.com.br');
+
+      expect(result.ok).toBe(true);
+      expect(order.status).toBe('FULL_SONG_QUEUED');
+    }
+  });
+
+  it('continua recusando regravar pedido não pago', async () => {
+    order.status = 'AWAITING_PAYMENT';
+    order.paid_at = null;
+
+    const result = await adminRegenerateFullSong('order-1', 'admin@exemplo.com.br');
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('não foi pago');
+    expect(jobs).toHaveLength(0);
+  });
+
+  it('clique duplo não gera duas gravações cobradas', async () => {
+    order.status = 'DELIVERED';
+    order.paid_at = '2026-08-23T12:00:00.000Z';
+
+    await adminRegenerateFullSong('order-1', 'admin@exemplo.com.br');
+    const second = await adminRegenerateFullSong('order-1', 'admin@exemplo.com.br');
+
+    expect(jobs.filter((job) => job.type === 'GENERATE_FULL_SONG')).toHaveLength(1);
+    expect(second.message).toContain('em andamento');
+  });
+
+  it('a liberação é exclusiva do painel: o fluxo automático não sai de DELIVERED', () => {
+    for (const status of ['FULL_SONG_READY', 'DELIVERY_PENDING', 'DELIVERED'] as OrderStatus[]) {
+      expect(canTransition(status, 'FULL_SONG_QUEUED')).toBe(false);
+      expect(canTransitionAsAdmin(status, 'FULL_SONG_QUEUED')).toBe(true);
+    }
+  });
+
+  it('nem o painel refaz letra ou prévia depois do pagamento', () => {
+    for (const status of ['PAID', 'FULL_SONG_READY', 'DELIVERED'] as OrderStatus[]) {
+      expect(canTransitionAsAdmin(status, 'STORY_PROCESSING')).toBe(false);
+      expect(canTransitionAsAdmin(status, 'PREVIEW_QUEUED')).toBe(false);
     }
   });
 });

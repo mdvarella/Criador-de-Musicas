@@ -30,7 +30,9 @@ const ACTIONS: Action[] = [
   {
     key: 'regenerate_full',
     label: 'Regenerar música',
-    confirm: 'Isso gera novamente a música completa e consome crédito. Continuar?',
+    confirm:
+      'Isso grava a música do zero e consome crédito de novo. A gravação atual ' +
+      'sai do ar até a nova ficar pronta — inclusive para um pedido já entregue. Continuar?',
   },
   { key: 'resend_delivery', label: 'Reenviar entrega' },
   {

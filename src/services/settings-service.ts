@@ -12,6 +12,20 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
  * antes da primeira migration rodar.
  */
 
+/**
+ * Nome de provider vindo do banco.
+ *
+ * Normaliza porque o valor é digitado à mão no Supabase: "MiniMax", " minimax"
+ * ou "minimax " são a mesma escolha, e antes qualquer um desses derrubava a
+ * geração com "MusicGenerationProvider desconhecido".
+ */
+function providerName(fallback: string) {
+  return z
+    .string()
+    .default(fallback)
+    .transform((value) => value.trim().toLowerCase());
+}
+
 export const settingsSchema = z.object({
   product_price_cents: z.number().int().min(0).default(4990),
   product_price_premium_cents: z.number().int().min(0).default(9990),
@@ -19,16 +33,16 @@ export const settingsSchema = z.object({
   preview_enabled: z.boolean().default(true),
   preview_duration_seconds: z.number().int().min(5).max(60).default(15),
   full_song_duration_seconds: z.number().int().min(30).max(600).default(150),
-  active_music_provider: z.string().default('elevenlabs'),
+  active_music_provider: providerName('elevenlabs'),
   /**
    * Provider da PRÉVIA, quando precisa ser diferente do da música completa.
    * Vazio significa "o mesmo". Existe porque nem todo provider controla
    * duração: o MiniMax decide o tamanho sozinho, e uma prévia com tamanho de
    * música inteira entregaria o produto de graça.
    */
-  active_preview_music_provider: z.string().default(''),
-  active_llm_provider: z.string().default('openai'),
-  active_payment_provider: z.string().default('mercadopago'),
+  active_preview_music_provider: providerName(''),
+  active_llm_provider: providerName('openai'),
+  active_payment_provider: providerName('mercadopago'),
   max_generation_attempts: z.number().int().min(1).max(10).default(3),
   maintenance_mode: z.boolean().default(false),
   payment_methods: z.array(z.string()).default(['pix', 'card']),

@@ -26,7 +26,12 @@ import { mediaUrl } from '@/lib/signing';
 import type { OrderStatus } from '@/types/domain';
 import { displayLyrics } from './lyrics';
 import { getSettings } from './settings-service';
-import { canTransition, statusesThatCanBecome } from './order-status';
+import {
+  canTransition,
+  canTransitionAsAdmin,
+  statusesThatCanBecome,
+  statusesThatCanBecomeAsAdmin,
+} from './order-status';
 
 /**
  * Consultas e ações do painel.
@@ -191,6 +196,17 @@ export async function adminRegeneratePreview(
  *
  * Só é permitida em pedido pago — a regra vale também para o administrador, e
  * é reforçada de novo dentro do serviço de geração.
+ *
+ * Funciona inclusive depois da entrega: o cliente que pagou e não gostou
+ * precisa de uma segunda gravação, e antes disso o painel respondia
+ * "não é possível regravar a música com o pedido em DELIVERED" sem oferecer
+ * saída nenhuma ao atendimento. É a única transição pós-entrega liberada, e
+ * só por decisão humana (ver `ADMIN_TRANSITIONS`).
+ *
+ * A gravação anterior é cancelada antes da nova entrar na fila, porque o banco
+ * só admite uma geração viva por tipo. Enquanto a nova não fica pronta, o link
+ * do cliente para de tocar — e o id da gravação cancelada vai para o histórico
+ * do pedido justamente para poder ser restaurado se a nova falhar.
  */
 export async function adminRegenerateFullSong(
   orderId: string,
@@ -203,13 +219,14 @@ export async function adminRegenerateFullSong(
     return { ok: false, message: 'Este pedido ainda não foi pago.' };
   }
 
-  const refusal = refuseIfCannot(order.status, 'FULL_SONG_QUEUED', 'regravar a música');
+  const refusal = refuseIfCannotAsAdmin(order.status, 'FULL_SONG_QUEUED', 'regravar a música');
   if (refusal) return refusal;
 
   const settings = await getSettings();
+  const previous = await findReadyGeneration(orderId, 'FULL');
   await cancelAliveGenerations(orderId, 'FULL', `regeneração solicitada por ${actor}`);
 
-  await updateOrderStatusIfIn(orderId, statusesThatCanBecome('FULL_SONG_QUEUED'), {
+  await updateOrderStatusIfIn(orderId, statusesThatCanBecomeAsAdmin('FULL_SONG_QUEUED'), {
     status: 'FULL_SONG_QUEUED',
   });
 
@@ -220,7 +237,11 @@ export async function adminRegenerateFullSong(
     maxAttempts: settings.max_generation_attempts,
   });
 
-  await audit(orderId, 'admin_regenerate_full', actor, { job_id: job?.id ?? null });
+  await audit(orderId, 'admin_regenerate_full', actor, {
+    job_id: job?.id ?? null,
+    from_status: order.status,
+    replaced_generation_id: previous?.id ?? null,
+  });
 
   if (!job) return { ok: true, message: alreadyRunning('gravação') };
   return { ok: true, message: 'Nova gravação entrou na fila.' };
@@ -305,6 +326,20 @@ function refuseIfCannot(
   action: string,
 ): AdminActionResult | null {
   if (canTransition(from, to)) return null;
+
+  return {
+    ok: false,
+    message: `Não é possível ${action} com o pedido em ${from}.`,
+  };
+}
+
+/** Idem, para as ações que o painel pode fazer fora do fluxo automático. */
+function refuseIfCannotAsAdmin(
+  from: OrderStatus,
+  to: OrderStatus,
+  action: string,
+): AdminActionResult | null {
+  if (canTransitionAsAdmin(from, to)) return null;
 
   return {
     ok: false,

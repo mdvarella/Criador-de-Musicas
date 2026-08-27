@@ -19,6 +19,8 @@ export { ElevenLabsMusicProvider } from './elevenlabs-provider';
 export { MinimaxMusicProvider } from './minimax-provider';
 export { MockMusicProvider, synthesizeWav } from './mock-provider';
 
+const KNOWN_MUSIC_PROVIDERS = ['elevenlabs', 'minimax', 'mock'] as const;
+
 /**
  * Escolhe o provider musical.
  *
@@ -57,6 +59,13 @@ export async function getMusicProvider(
         costPerGenerationUsd: settings.minimax_cost_per_generation_usd,
       });
     default:
-      throw new Error(`MusicGenerationProvider desconhecido: ${configured}`);
+      // A causa quase sempre é uma das duas: o nome foi digitado errado no
+      // Supabase, ou o processo que roda a fila subiu antes do provider existir
+      // no código (`npm run jobs:work` não recarrega sozinho).
+      throw new Error(
+        `MusicGenerationProvider desconhecido: "${configured}". ` +
+          `Valores aceitos: ${KNOWN_MUSIC_PROVIDERS.join(', ')}. ` +
+          'Confira active_music_provider em app_settings e reinicie o worker da fila.',
+      );
   }
 }

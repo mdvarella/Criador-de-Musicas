@@ -33,8 +33,9 @@ const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
     'FAILED',
   ],
   PAYMENT_PROCESSING: ['PAID', 'AWAITING_PAYMENT', 'CANCELLED', 'FAILED'],
-  // Depois de PAID não existe retrabalho de graça: a música completa já foi
-  // paga, e refazer letra ou prévia sairia do fluxo comercial.
+  // Depois de PAID não existe retrabalho automático: a música completa já foi
+  // paga, e refazer letra ou prévia sairia do fluxo comercial. Regravar a
+  // música é possível, mas só por decisão humana — ver ADMIN_TRANSITIONS.
   PAID: ['FULL_SONG_QUEUED', 'REFUNDED', 'FAILED'],
   FULL_SONG_QUEUED: ['FULL_SONG_GENERATING', 'FAILED', 'REFUNDED'],
   FULL_SONG_GENERATING: ['FULL_SONG_READY', 'FAILED', 'REFUNDED'],
@@ -57,9 +58,33 @@ const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   REFUNDED: [],
 };
 
+/**
+ * Transições que existem apenas por ação humana no painel.
+ *
+ * O grafo acima descreve o fluxo automático, e é ele que job, webhook e
+ * serviço de geração enxergam: nada consegue tirar sozinho um pedido de
+ * DELIVERED. Mas atendimento precisa — o cliente pagou, ouviu a música e não
+ * gostou. Regravar custa dinheiro de verdade em cada tentativa, então a
+ * decisão é de uma pessoa, com confirmação, e não de um retry de fila.
+ *
+ * Só a música completa entra aqui. Refazer letra ou prévia depois do
+ * pagamento continua proibido: o produto entregue é a música.
+ */
+const ADMIN_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  FULL_SONG_READY: ['FULL_SONG_QUEUED'],
+  DELIVERY_PENDING: ['FULL_SONG_QUEUED'],
+  DELIVERED: ['FULL_SONG_QUEUED'],
+};
+
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   if (from === to) return true; // idempotência: reaplicar o mesmo status é inofensivo
   return TRANSITIONS[from].includes(to);
+}
+
+/** Como `canTransition`, mais o que o painel pode fazer por decisão humana. */
+export function canTransitionAsAdmin(from: OrderStatus, to: OrderStatus): boolean {
+  if (canTransition(from, to)) return true;
+  return ADMIN_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
 export function allowedTransitions(from: OrderStatus): OrderStatus[] {
@@ -69,6 +94,13 @@ export function allowedTransitions(from: OrderStatus): OrderStatus[] {
 /** Estados a partir dos quais uma transição para `to` é válida. */
 export function statusesThatCanBecome(to: OrderStatus): OrderStatus[] {
   return (Object.keys(TRANSITIONS) as OrderStatus[]).filter((from) => canTransition(from, to));
+}
+
+/** Idem, incluindo as transições exclusivas do painel. */
+export function statusesThatCanBecomeAsAdmin(to: OrderStatus): OrderStatus[] {
+  return (Object.keys(TRANSITIONS) as OrderStatus[]).filter((from) =>
+    canTransitionAsAdmin(from, to),
+  );
 }
 
 const PAID_STATUSES = new Set<OrderStatus>([
